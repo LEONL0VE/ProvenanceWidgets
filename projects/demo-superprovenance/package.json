@@ -1,0 +1,24 @@
+{
+  "name": "demo-superprovenance",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@mantine/core": "^8.3.7",
+    "d3": "^7.9.0",
+    "d3-color": "^3.1.0",
+    "primereact": "^10.9.7",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-tooltip": "^5.30.0",
+    "tstl": "^3.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.7"
+  }
+}
