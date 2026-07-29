@@ -8,10 +8,10 @@ export default defineConfig({
 
   // React must be provided by the consuming application.
   external: [
-    "react",
-    "react-dom",
-    "react/jsx-runtime",
-  ],
+  /^react(?:\/.*)?$/,
+  /^react-dom(?:\/.*)?$/,
+  /^preact(?:\/.*)?$/,
+],
 
   // These dependencies need to be bundled because some expose
   // source files or module paths that Node cannot load directly.
