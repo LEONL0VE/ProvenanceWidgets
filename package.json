@@ -32,7 +32,8 @@
   "scripts": {
     "test": "node --test",
     "build": "tsup",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "prepare": "npm run build"
   },
   "devDependencies": {
     "tsup": "^8.5.1",
