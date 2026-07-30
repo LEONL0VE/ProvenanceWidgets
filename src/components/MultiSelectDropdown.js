@@ -1,253 +1,805 @@
-import { MultiSelect as MultiSelect_ } from 'primereact/multiselect/multiselect.esm.js';
-import { useEffect, useRef, useState, useMemo } from 'react';
-import SelectionProvenance from '../strategies/provenance/SelectionProvenance.ts';
-import { UNILATERAL_GUIDANCE_EVENT_NAME } from '../constants.ts';
-import useProvenance from './hooks/useProvenance.js';
-import { interpolateOranges } from 'd3';
-import Bars from 'scents';
-import useRevertedValue from './hooks/useRevertedValue.js';
-import TimelineVis from './TimelineVis.js';
-import useProvenanceTooltip from './hooks/useProvenanceTooltip.js';
+import { MultiSelect as MultiSelect_ } from "primereact/multiselect/multiselect.esm.js";
+import { Slider as Slider_ } from "primereact/slider/slider.esm.js";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
+import { interpolateOranges } from "d3";
+import Bars from "scents";
+import SelectionProvenance from "../strategies/provenance/SelectionProvenance.ts";
+import { UNILATERAL_GUIDANCE_EVENT_NAME } from "../constants.ts";
+import useProvenanceController from "./hooks/useProvenanceController.js";
+import useRevertedValue from "./hooks/useRevertedValue.js";
+import useWidgetRegistry from "./hooks/useWidgetRegistry.js";
+import useElementSize from "./hooks/useElementSize.js";
+import useProvenanceTooltip from "./hooks/useProvenanceTooltip.js";
+import TimelineVis from "./TimelineVis.js";
+import DropdownBarLabel from "./DropdownBarLabel.js";
 import {
     formatAggregateTooltip,
     getAggregateTooltipRecord,
     getTooltipAnchorProps,
-} from './provenanceTooltip.js';
+} from "./provenanceTooltip.js";
+import {
+    getSingleSelectOptionKey,
+    getSingleSelectOptionLabel,
+} from "./singleSelectDropdownValue.js";
+import {
+    callMultiSelectCallbacks,
+    getControlledMultiSelectValue,
+    getInitialMultiSelectValue,
+    getMultiSelectCaller,
+    getMultiSelectKeysAtTimelinePoint,
+    getPrimeMultiSelectValue,
+    isResolvableMultiSelectValue,
+    multiSelectToProvenanceValue,
+    multiSelectValueKey,
+    provenanceValueToMultiSelect,
+    resolveMultiSelectOptions,
+    restoreMultiSelectTemporalValue,
+} from "./multiSelectDropdownValue.js";
+import {
+    getSelectionTimeDomain,
+    normalizeSelectionBrushRange,
+} from "./selectionTimeline.js";
 
-import useElementSize from './hooks/useElementSize.js';
-import DropdownBarLabel from './DropdownBarLabel.js';
-
-const MultiSelectItem = ({ option, guidance, showTimeline, widgetId }) => {
-    const [containerRef, { width: containerWidth }] = useElementSize();
-    const tooltipId = useProvenanceTooltip();
-    const timelineVersion = guidance?.domain?.get?.("index")?.[1] ?? 0;
+const MultiSelectItem = ({
+    children,
+    optionKey,
+    guidance,
+    hasProvenance,
+    mode,
+    showTimeline,
+    timeDomain,
+    brushRange,
+    target,
+    tooltipLabel,
+    visualize,
+    onTemporalRestore,
+}) => {
+    const [containerRef, { width: containerWidth }] =
+        useElementSize();
+    const tooltip = useProvenanceTooltip();
+    const timelineVersion =
+        guidance?.domain?.get?.("index")?.[1] ?? 0;
+    const timeVersion =
+        guidance?.domain?.get?.("time")?.[2] ?? 0;
 
     const timelineData = useMemo(() => {
-        if (!showTimeline || !guidance?.detailedData) return null;
-        
-        const detailedData = guidance.detailedData;
-        const records = detailedData.get(option.value);
+        if (
+            !showTimeline ||
+            !hasProvenance ||
+            !guidance?.detailedData
+        ) {
+            return null;
+        }
+        const records = guidance.detailedData.get(optionKey);
         if (!records) return null;
 
-        // Calculate max index for the entire group
         let maxIndex = 0;
-        const allRecords = Array.from(detailedData.values()).flat();
-        for (const record of allRecords) {
-            if (record.select?.index > maxIndex) maxIndex = record.select.index;
-            if (record.unselect?.index > maxIndex) maxIndex = record.unselect.index;
+        for (const optionRecords of guidance.detailedData.values()) {
+            for (const record of optionRecords) {
+                maxIndex = Math.max(
+                    maxIndex,
+                    record.select?.index ?? 0,
+                    record.unselect?.index ?? 0
+                );
+            }
         }
-        
-        // Also check domain if available
-        const domainMax = guidance.domain?.get ? guidance.domain.get("index")?.[1] : 0;
-        
-        // Effective max should be at least domainMax + 1 to account for current state width
-        const displayMax = Math.max(maxIndex, domainMax || 0) + 1;
+        const domainMax =
+            guidance.domain?.get?.("index")?.[1] ?? 0;
+        return {
+            records,
+            // Match PW 1.0's final interval from the last event to "now".
+            maxIndex: Math.max(maxIndex, domainMax) + 1,
+        };
+    }, [
+        showTimeline,
+        hasProvenance,
+        guidance,
+        optionKey,
+        timelineVersion,
+        timeVersion,
+    ]);
 
-        return { records, maxIndex: displayMax };
-    }, [showTimeline, guidance, option.value, timelineVersion]);
-
-    const aggregateTooltipProps = !showTimeline
-        ? getTooltipAnchorProps(
-            tooltipId,
-            formatAggregateTooltip({
-                label: widgetId,
-                value: option.value,
-                record: getAggregateTooltipRecord(
-                    guidance,
-                    option.value,
-                    'multi-selection'
-                ),
-                kind: 'multi-selection',
-            }),
-            { focusable: false }
-        )
-        : {};
+    const aggregateTooltipProps =
+        visualize && hasProvenance && !showTimeline
+            ? getTooltipAnchorProps(
+                tooltip,
+                () => formatAggregateTooltip({
+                    label: tooltipLabel,
+                    value: optionKey,
+                    record: getAggregateTooltipRecord(
+                        guidance,
+                        optionKey,
+                        "multi-selection"
+                    ),
+                    kind: "multi-selection",
+                }),
+                { focusable: false }
+            )
+            : {};
 
     return (
         <div
             ref={containerRef}
             {...aggregateTooltipProps}
+            data-provenance-chart-target={target}
+            data-provenance-option={optionKey}
             style={{
                 ...aggregateTooltipProps.style,
-                position: 'relative',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                padding: '0 8px',
-                width: '100%',
+                position: "relative",
+                height: "32px",
+                display: "flex",
+                alignItems: "center",
+                padding: "0 8px",
+                width: "100%",
                 flex: 1,
             }}
         >
-            {!showTimeline && containerWidth > 0 && guidance && (
-                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 }}>
-                    <Bars
-                        guidance={guidance}
-                        orientationScheme={interpolateOranges}
-                        barKeys={[option.value]}
-                        encodings={{
-                            orientation: "horizontal",
-                            positionDomain: "interactions",
-                            colorDomain: "index",
+            {visualize &&
+                hasProvenance &&
+                !showTimeline &&
+                containerWidth > 0 && (
+                    <div
+                        aria-hidden="true"
+                        style={{
+                            position: "absolute",
+                            inset: 0,
+                            zIndex: 0,
                         }}
-                        width={containerWidth}
-                        height={32}
-                        layout="checkbox"
-                        style={{ width: '100%', height: '100%' }}
-                    />
-                </div>
-            )}
+                    >
+                        <Bars
+                            guidance={guidance}
+                            orientationScheme={interpolateOranges}
+                            barKeys={[optionKey]}
+                            encodings={{
+                                orientation: "horizontal",
+                                positionDomain: "interactions",
+                                colorDomain:
+                                    mode === "time"
+                                        ? "interactionTime"
+                                        : "interactionIndex",
+                            }}
+                            width={containerWidth}
+                            height={32}
+                            layout="checkbox"
+                            style={{
+                                width: "100%",
+                                height: "100%",
+                            }}
+                        />
+                    </div>
+                )}
 
-            {/* Render Timeline In-Situ (Background Layer) */}
-            {showTimeline && timelineData && (
-                <div style={{ position: 'absolute', inset: 0, zIndex: 0, display: 'flex', alignItems: 'center' }}>
-                    <TimelineVis
-                        records={timelineData.records}
-                        maxIndex={timelineData.maxIndex}
-                        tooltipId={tooltipId}
-                        widgetId={widgetId}
-                        value={option.value}
-                        kind="multi-selection"
-                    />
-                </div>
-            )}
+            {visualize &&
+                showTimeline &&
+                timelineData && (
+                    <div
+                        style={{
+                            position: "absolute",
+                            inset: 0,
+                            zIndex: 0,
+                            display: "flex",
+                            alignItems: "center",
+                        }}
+                    >
+                        <TimelineVis
+                            records={timelineData.records}
+                            maxIndex={timelineData.maxIndex}
+                            mode={mode}
+                            timeDomain={timeDomain}
+                            brushRange={brushRange}
+                            tooltipId={tooltip}
+                            widgetId={tooltipLabel}
+                            value={optionKey}
+                            kind="multi-selection"
+                            onRestore={(
+                                _value,
+                                _record,
+                                _event,
+                                context
+                            ) => onTemporalRestore(context)}
+                        />
+                    </div>
+                )}
 
             <DropdownBarLabel
-                value={option.value}
+                value={optionKey}
                 guidance={guidance}
                 orientationScheme={interpolateOranges}
                 containerWidth={containerWidth}
                 showTimeline={showTimeline}
+                positionDomain="interactions"
+                colorDomain={
+                    mode === "time"
+                        ? "interactionTime"
+                        : "interactionIndex"
+                }
             >
-                {option.label || option.value}
+                {children}
             </DropdownBarLabel>
         </div>
     );
 };
 
+/**
+ * V2 Multi Select Dropdown with the PW 1.0 provenance contract.
+ *
+ * Public selected values remain complete option objects. Provenance stores
+ * stable option keys so imported V1 selections and SuperProvenance replay do
+ * not depend on object identity.
+ */
 const MultiSelectDropdown = (props) => {
-    const [values, setValues] = useState([]);
-    const [revertedValue] = useRevertedValue(props.id);
+    const {
+        id,
+        options = [],
+        selected: _selected,
+        defaultSelected: _defaultSelected,
+        value: _value,
+        defaultValue: _defaultValue,
+        onSelectedChange: _onSelectedChange,
+        selectedChange: _selectedChange,
+        onChange: _onChange,
+        provenance: _provenance,
+        onProvenanceChange: _onProvenanceChange,
+        provenanceChange: _provenanceChange,
+        mode: _mode,
+        sampleIntervalMs: _sampleIntervalMs,
+        freeze: _freeze,
+        visualize: _visualize,
+        dataLabel,
+        "data-label": legacyDataLabel,
+        multiSelectProps = {},
+        temporalBrush: temporalBrushProp,
+        enableTemporalBrush,
+        ...primeProps
+    } = props;
+    const tooltipLabel = dataLabel ?? legacyDataLabel ?? id;
+    const visualize = props.visualize ?? true;
+    const temporalBrush =
+        temporalBrushProp ?? enableTemporalBrush ?? false;
+    const config = useMemo(
+        () => ({
+            dataKey: props.dataKey,
+            optionLabel: props.optionLabel,
+            optionValue: props.optionValue,
+        }),
+        [
+            props.dataKey,
+            props.optionLabel,
+            props.optionValue,
+        ]
+    );
+    const initialSelectionRef = useRef(
+        getInitialMultiSelectValue(props, options, config)
+    );
+    const initialProvenanceValueRef = useRef(
+        multiSelectToProvenanceValue(
+            initialSelectionRef.current,
+            config
+        )
+    );
+    const [revertedValue] = useRevertedValue(id);
+    const {
+        registerWidget,
+        notifyWidget,
+        restoreWidgetValue,
+    } = useWidgetRegistry();
     const [showTimeline, setShowTimeline] = useState(false);
+    const [brushRange, setBrushRange] = useState([0, 100]);
+    const elementRef = useRef(null);
     const dropdownRef = useRef(null);
+    const propsRef = useRef(props);
+    const optionsRef = useRef(options);
+    const configRef = useRef(config);
+    propsRef.current = props;
+    optionsRef.current = options;
+    configRef.current = config;
+
+    const strategyFactory = useMemo(
+        () => () => {
+            const strategy = new SelectionProvenance();
+            strategy.tooltipLabel = tooltipLabel;
+            strategy.tooltipIndexOffset = 1;
+            return strategy;
+        },
+        [tooltipLabel]
+    );
+
+    const {
+        currentValue,
+        strategy,
+        hasProvenance,
+        provenance: serializedProvenance,
+        mode: provenanceMode,
+        recordInteraction,
+        recordExternalChange,
+        restoreValue,
+    } = useProvenanceController({
+        id,
+        widgetType: "multiselect",
+        value: initialProvenanceValueRef.current,
+        provenance: props.provenance,
+        mode: props.mode,
+        sampleIntervalMs: props.sampleIntervalMs,
+        freeze: props.freeze,
+        visualize,
+        onProvenanceChange:
+            props.onProvenanceChange ?? props.provenanceChange,
+        strategyFactory,
+    });
+    const [selection, setSelection] = useState(() =>
+        provenanceValueToMultiSelect(
+            currentValue,
+            options,
+            config
+        )
+    );
+    const currentValueRef = useRef(currentValue);
+    const selectionRef = useRef(selection);
+    const serializedProvenanceRef = useRef(serializedProvenance);
+    currentValueRef.current = currentValue;
+    selectionRef.current = selection;
+    serializedProvenanceRef.current = serializedProvenance;
+    const currentValueKey = multiSelectValueKey(currentValue);
+    const historyVersion = serializedProvenance.data
+        .map(record => record.timestamp)
+        .join("|");
+    const timeDomain = useMemo(
+        () => getSelectionTimeDomain(serializedProvenance.data),
+        [historyVersion]
+    );
 
     useEffect(() => {
-        const handleToggle = (e) => {
-            if (e.detail && e.detail.target === props.id) {
-                const isOpen = e.detail.open;
-                setShowTimeline(isOpen);
-                // Programmatically open/close the dropdown
-                if (dropdownRef.current) {
-                    if (isOpen) {
-                        dropdownRef.current.show();
-                    } else {
-                        dropdownRef.current.hide();
-                    }
-                }
-            }
-        };
-        window.addEventListener('provenance-dropdown-toggle', handleToggle);
-        return () => window.removeEventListener('provenance-dropdown-toggle', handleToggle);
-    }, [props.id]);
+        const restored = provenanceValueToMultiSelect(
+            currentValue,
+            options,
+            config
+        );
+        setSelection(restored);
+    }, [currentValueKey, options, config]);
+
+    const controlledSelection = getControlledMultiSelectValue(
+        props,
+        options,
+        config
+    );
+    const controlledPresent = controlledSelection !== undefined;
+    const controlledValue = controlledPresent
+        ? multiSelectToProvenanceValue(
+            controlledSelection,
+            config
+        )
+        : undefined;
+    const controlledValueKey = controlledPresent
+        ? multiSelectValueKey(controlledValue)
+        : "__uncontrolled__";
+    const previousControlledKeyRef =
+        useRef(controlledValueKey);
+    const previousProvenanceRef = useRef(props.provenance);
+    const emittedValueKeyRef = useRef(null);
 
     useEffect(() => {
-        if (revertedValue && Array.isArray(revertedValue)) {
-            setValues(revertedValue);
-            if (provRef.current) {
-                provRef.current.insert(revertedValue);
-                lastKeyRef.current = JSON.stringify(revertedValue);
+        const provenanceChanged =
+            props.provenance !== previousProvenanceRef.current;
+        const controlledChanged =
+            controlledValueKey !==
+            previousControlledKeyRef.current;
+
+        if (controlledPresent && controlledChanged) {
+            setSelection(controlledSelection);
+            if (
+                emittedValueKeyRef.current === controlledValueKey ||
+                provenanceChanged
+            ) {
+                emittedValueKeyRef.current = null;
+            } else {
+                recordExternalChange(controlledValue, {
+                    caller: getMultiSelectCaller(
+                        currentValueRef.current,
+                        controlledValue
+                    ),
+                });
             }
         }
-    }, [revertedValue]);
+        previousControlledKeyRef.current = controlledValueKey;
+        previousProvenanceRef.current = props.provenance;
+    }, [
+        controlledPresent,
+        controlledSelection,
+        controlledValue,
+        controlledValueKey,
+        props.provenance,
+        recordExternalChange,
+    ]);
 
-    const [registeredComponents, setRegisteredComponents] = useProvenance();
-    const provRef = useRef(null);
-    const lastKeyRef = useRef(null);
-    const tooltipLabel = props['data-label'] || props.id;
+    const applyRegisteredValue = useCallback(
+        (nextValue, source = "history") => {
+            if (
+                !isResolvableMultiSelectValue(
+                    nextValue,
+                    optionsRef.current,
+                    configRef.current
+                )
+            ) {
+                return false;
+            }
+            const restored = provenanceValueToMultiSelect(
+                nextValue,
+                optionsRef.current,
+                configRef.current
+            );
+            const provenanceValue =
+                multiSelectToProvenanceValue(
+                    restored,
+                    configRef.current
+                );
+            const changed = restoreValue(provenanceValue, {
+                caller: getMultiSelectCaller(
+                    currentValueRef.current,
+                    provenanceValue
+                ),
+            });
+            emittedValueKeyRef.current =
+                multiSelectValueKey(provenanceValue);
+            setSelection(restored);
+            callMultiSelectCallbacks(
+                propsRef.current,
+                restored,
+                { source }
+            );
+            return changed;
+        },
+        [restoreValue]
+    );
 
     useEffect(() => {
-        const p = new SelectionProvenance();
-        p.tooltipLabel = tooltipLabel;
-        provRef.current = p;
-        setRegisteredComponents(prev => {
-            const newMap = prev instanceof Map ? new Map(prev) : new Map();
-            newMap.set(props.id, p);
-            return newMap;
-        });
-        p.addEventListener(UNILATERAL_GUIDANCE_EVENT_NAME, v => {
-            setRegisteredComponents(prev => {
-                if (prev instanceof Map) {
-                    return new Map(prev);
-                }
-                return new Map();
-            });
-        });
-    }, []);
+        if (!strategy) return undefined;
+        strategy.hasUserInteracted = hasProvenance;
+        strategy.tooltipLabel = tooltipLabel;
+        strategy.tooltipIndexOffset = 1;
+        notifyWidget(id);
+        return undefined;
+    }, [
+        strategy,
+        hasProvenance,
+        tooltipLabel,
+        id,
+        notifyWidget,
+    ]);
 
-    const onChange = (vals) => {
-        const sorted = Array.isArray(vals) ? [...vals].sort() : [];
-        const oldSet = new Set(values || []);
-        const newSet = new Set(sorted);
-        let caller = null;
-        for (const v of newSet) { if (!oldSet.has(v)) { caller = v; break; } }
-        if (!caller) { for (const v of oldSet) { if (!newSet.has(v)) { caller = v; break; } } }
+    useEffect(() => {
+        if (!strategy) return undefined;
+        const registration = {
+            id,
+            type: "multiselect",
+            provenance: strategy,
+            getProvenance: () => serializedProvenanceRef.current,
+            elementRef,
+            getValue: () => selectionRef.current,
+            setValue: applyRegisteredValue,
+            visualize,
+            mode: provenanceMode,
+            focus: () => {
+                elementRef.current?.scrollIntoView?.({
+                    behavior: "smooth",
+                    block: "center",
+                });
+                (
+                    elementRef.current?.querySelector?.(
+                        '[role="combobox"]'
+                    ) ??
+                    elementRef.current
+                )?.focus?.();
+            },
+        };
+        const unregister = registerWidget(registration);
+        const refreshRegistry = () => notifyWidget(id);
+        strategy.addEventListener(
+            UNILATERAL_GUIDANCE_EVENT_NAME,
+            refreshRegistry
+        );
+        return () => {
+            strategy.removeEventListener(
+                UNILATERAL_GUIDANCE_EVENT_NAME,
+                refreshRegistry
+            );
+            unregister();
+        };
+    }, [
+        strategy,
+        id,
+        applyRegisteredValue,
+        registerWidget,
+        notifyWidget,
+        visualize,
+        provenanceMode,
+    ]);
 
-        setValues(sorted);
-        const key = JSON.stringify(sorted);
-        if (lastKeyRef.current === key) return;
-        provRef.current.insert(sorted, caller ? { caller } : undefined);
-        lastKeyRef.current = key;
+    useEffect(() => {
+        const handleToggle = event => {
+            if (event.detail?.target !== id) return;
+            const open = Boolean(event.detail.open);
+            setShowTimeline(open);
+            if (open) {
+                dropdownRef.current?.show?.();
+            } else {
+                dropdownRef.current?.hide?.();
+            }
+        };
+        window.addEventListener(
+            "provenance-dropdown-toggle",
+            handleToggle
+        );
+        return () => window.removeEventListener(
+            "provenance-dropdown-toggle",
+            handleToggle
+        );
+    }, [id]);
+
+    useEffect(() => {
+        if (revertedValue === undefined) return;
+        applyRegisteredValue(revertedValue, "history");
+    }, [revertedValue, applyRegisteredValue]);
+
+    const handleChange = event => {
+        const nextSelection = resolveMultiSelectOptions(
+            options,
+            event.value,
+            config
+        );
+        const nextValue = multiSelectToProvenanceValue(
+            nextSelection,
+            config
+        );
+        emittedValueKeyRef.current =
+            multiSelectValueKey(nextValue);
+        recordInteraction(nextValue, {
+            caller: getMultiSelectCaller(
+                currentValueRef.current,
+                nextValue
+            ),
+        });
+        setSelection(nextSelection);
+        callMultiSelectCallbacks(
+            props,
+            nextSelection,
+            event
+        );
+        multiSelectProps.onChange?.(event);
     };
 
-    const itemTemplate = (option) => {
-        return <MultiSelectItem
-            option={option}
-            guidance={provRef.current}
-            showTimeline={showTimeline}
-            widgetId={tooltipLabel}
-        />;
+    const handleTemporalRestore = context => {
+        const keys = getMultiSelectKeysAtTimelinePoint({
+            guidance: strategy,
+            // TimelineVis removes PW 1.0's baseline index for plotting. The
+            // strategy intervals retain that index, so add it back before
+            // resolving the simultaneously selected set.
+            point:
+                provenanceMode === "interaction" &&
+                context?.point !== undefined
+                ? Number(context?.point) + 1
+                : context?.point,
+            mode: provenanceMode,
+        });
+        restoreMultiSelectTemporalValue({
+            restoreWidgetValue,
+            target: id,
+            value: keys,
+        });
     };
 
-    // Custom panel footer for the timeline axis
-    const panelFooterTemplate = () => {
-        if (!showTimeline) return null;
-        return (
-             <div style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '8px 12px', borderTop: '1px solid #333' }}>
-                 {/* The Line */}
-                 <div style={{ width: 'calc(100% - 12px)', marginLeft: '20px', height: '4px', background: '#555', borderRadius: '2px', position: 'relative' }}></div>
-                 {/* The Labels below */}
-                 <div style={{ width: 'calc(100% - 12px)', marginLeft: '6px', display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-                     <span style={{ fontSize: '12px', color: '#ccc', fontWeight: 'bold' }}>n=0</span>
-                     <span style={{ fontSize: '12px', color: '#ccc', fontWeight: 'bold' }}>now</span>
-                 </div>
-             </div>
+    const handleBrushChange = event => {
+        setBrushRange(
+            normalizeSelectionBrushRange(event.value)
         );
     };
 
+    const handleBrushEnd = event => {
+        const range = normalizeSelectionBrushRange(
+            event.value ?? brushRange
+        );
+        setBrushRange(range);
+        window.dispatchEvent(new CustomEvent(
+            "provenance-widgets",
+            {
+                detail: {
+                    id,
+                    widget: "multiselect",
+                    mode: provenanceMode,
+                    interaction: "brush-end",
+                    data: { selection: range },
+                },
+            }
+        ));
+    };
+
+    const originalItemTemplate =
+        multiSelectProps.itemTemplate ??
+        primeProps.itemTemplate;
+    const originalFooterTemplate =
+        multiSelectProps.panelFooterTemplate ??
+        primeProps.panelFooterTemplate;
+    const safePanelClass =
+        `provenance-multiselect-panel-${String(id)
+            .replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+    const panelClassName = [
+        primeProps.panelClassName,
+        multiSelectProps.panelClassName,
+        safePanelClass,
+    ].filter(Boolean).join(" ");
+    const primeValue = getPrimeMultiSelectValue(
+        selection,
+        config
+    );
+
     return (
-        <div style={{ marginTop: "1rem" }} id={props.id} data-widget-id={props.id}>
+        <div
+            ref={elementRef}
+            data-label={tooltipLabel}
+            data-widget-id={id}
+            data-provenance-open={
+                showTimeline ? "true" : "false"
+            }
+            style={{
+                marginTop: "1rem",
+                position: "relative",
+            }}
+        >
             <style>{`
-                .p-multiselect-item {
+                .${safePanelClass} .p-multiselect-item {
                     padding: 0 !important;
                 }
-                .p-multiselect-item-content {
+                .${safePanelClass} .p-multiselect-item-content {
                     width: 100%;
+                    min-width: 0;
                 }
-                .p-multiselect-item > span {
+                .${safePanelClass} .p-multiselect-item > span {
                     flex-grow: 1;
+                    min-width: 0;
                 }
             `}</style>
             <MultiSelect_
+                {...primeProps}
+                {...multiSelectProps}
                 ref={dropdownRef}
-                id={props.id}
-                data-widget-id={props.id}
-                options={props.options}
-                value={values}
-                onChange={(e) => onChange(e.value)}
-                placeholder={props.placeholder || "Select"}
-                display="chip"
-                style={{ width: "100%" }}
-                itemTemplate={itemTemplate}
-                panelFooterTemplate={panelFooterTemplate}
+                id={id}
+                data-widget-id={id}
+                options={options}
+                value={primeValue}
+                onChange={handleChange}
+                placeholder={props.placeholder ?? "Select"}
+                display={props.display ?? "chip"}
+                style={{
+                    width: "100%",
+                    ...primeProps.style,
+                    ...multiSelectProps.style,
+                }}
+                panelClassName={panelClassName}
+                onShow={event => {
+                    primeProps.onShow?.(event);
+                    primeProps.onPanelShow?.(event);
+                    multiSelectProps.onShow?.(event);
+                    multiSelectProps.onPanelShow?.(event);
+                }}
+                onHide={event => {
+                    primeProps.onHide?.(event);
+                    primeProps.onPanelHide?.(event);
+                    multiSelectProps.onHide?.(event);
+                    multiSelectProps.onPanelHide?.(event);
+                    if (showTimeline) {
+                        window.dispatchEvent(new CustomEvent(
+                            "provenance-dropdown-visibility",
+                            {
+                                detail: {
+                                    target: id,
+                                    open: false,
+                                },
+                            }
+                        ));
+                    }
+                }}
+                onFilter={event => {
+                    primeProps.onFilter?.(event);
+                    multiSelectProps.onFilter?.(event);
+                }}
+                itemTemplate={(option, templateOptions) => {
+                    const optionKey =
+                        getSingleSelectOptionKey(option, config);
+                    const content = originalItemTemplate
+                        ? originalItemTemplate(
+                            option,
+                            templateOptions
+                        )
+                        : getSingleSelectOptionLabel(
+                            option,
+                            config
+                        );
+                    return (
+                        <MultiSelectItem
+                            optionKey={optionKey}
+                            guidance={strategy}
+                            hasProvenance={hasProvenance}
+                            mode={provenanceMode}
+                            showTimeline={showTimeline}
+                            timeDomain={timeDomain}
+                            brushRange={brushRange}
+                            target={id}
+                            tooltipLabel={tooltipLabel}
+                            visualize={visualize}
+                            onTemporalRestore={
+                                handleTemporalRestore
+                            }
+                        >
+                            {content}
+                        </MultiSelectItem>
+                    );
+                }}
+                panelFooterTemplate={templateOptions => (
+                    <>
+                        {originalFooterTemplate?.(templateOptions)}
+                        {showTimeline && (
+                            <div
+                                data-provenance-temporal-footer={id}
+                                style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    width: "100%",
+                                    padding: "8px 12px",
+                                    gap: "6px",
+                                    borderTop: "1px solid #ced4da",
+                                    backgroundColor: "#fff",
+                                }}
+                            >
+                                {temporalBrush && (
+                                    <div
+                                        data-provenance-temporal-brush={id}
+                                        title={
+                                            "Drag both handles to zoom " +
+                                            "the visible provenance range"
+                                        }
+                                    >
+                                        <Slider_
+                                            range
+                                            min={0}
+                                            max={100}
+                                            value={brushRange}
+                                            onChange={handleBrushChange}
+                                            onSlideEnd={handleBrushEnd}
+                                        />
+                                    </div>
+                                )}
+                                <div
+                                    aria-hidden="true"
+                                    style={{
+                                        height: "2px",
+                                        backgroundColor: "#343a40",
+                                    }}
+                                />
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        fontSize: "12px",
+                                        color: "#6c757d",
+                                        fontWeight: "bold",
+                                    }}
+                                >
+                                    <span>
+                                        {provenanceMode === "time"
+                                            ? "t=0"
+                                            : "n=0"}
+                                    </span>
+                                    <span>now</span>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
             />
         </div>
     );

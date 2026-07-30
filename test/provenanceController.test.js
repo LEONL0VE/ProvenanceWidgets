@@ -308,6 +308,36 @@ test("records scalar dropdown keys, clearing, and history restore", () => {
     assert.deepEqual(sources, ["user", "user", "history"]);
 });
 
+test("records complete Multi Select sets as simultaneous interactions", () => {
+    const strategy = createStrategy();
+    const controller = new ProvenanceController({
+        id: "customer-city-multi-filter",
+        widgetType: "multiselect",
+        value: ["NY"],
+        strategy,
+    });
+
+    assert.equal(controller.getSnapshot().hasProvenance, false);
+    assert.equal(controller.recordInteraction(["NY", "LDN"], {
+        caller: "LDN",
+    }), true);
+    assert.equal(controller.recordInteraction(["NY", "LDN"], {
+        caller: "LDN",
+    }), false);
+    assert.equal(controller.restoreValue(["LDN"], {
+        caller: "NY",
+    }), true);
+
+    assert.deepEqual(
+        controller.exportProvenance().data.map(record => record.value),
+        [["NY"], ["NY", "LDN"], ["LDN"]]
+    );
+    assert.deepEqual(
+        strategy.inserts.map(insert => insert.value),
+        [["NY"], ["NY", "LDN"], ["LDN"]]
+    );
+});
+
 test("can pause and restart time sampling for React lifecycle replay", () => {
     let intervalCount = 0;
     let clearCount = 0;

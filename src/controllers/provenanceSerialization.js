@@ -150,6 +150,27 @@ const normalizeLegacyValue = (value, widgetType) => {
             return value[0] ?? null;
         }
     }
+    if (
+        widgetType === "multiselect" ||
+        widgetType === "checkbox-group"
+    ) {
+        if (
+            !Array.isArray(value) ||
+            !value.every(item =>
+                typeof item === "string" ||
+                (
+                    typeof item === "number" &&
+                    Number.isFinite(item)
+                )
+            )
+        ) {
+            throw new TypeError(
+                "Multiple-selection provenance values must be " +
+                "arrays of stable string or number keys"
+            );
+        }
+        return Array.from(new Set(value));
+    }
     return value;
 };
 
@@ -270,11 +291,13 @@ export const normalizeSerializedProvenance = (
     const effectiveWidgetType = isV2
         ? provenance.widgetType ?? widgetType
         : widgetType;
-    const legacySingleSelectionWithoutBaseline =
+    const legacySelectionWithoutBaseline =
         !isV2 &&
         (
             effectiveWidgetType === "dropdown" ||
-            effectiveWidgetType === "radio-group"
+            effectiveWidgetType === "radio-group" ||
+            effectiveWidgetType === "multiselect" ||
+            effectiveWidgetType === "checkbox-group"
         ) &&
         provenance.hasUserInteracted === true &&
         rawData.length === 1;
@@ -297,7 +320,7 @@ export const normalizeSerializedProvenance = (
             defaultKind: isV2
                 ? "interaction"
                 : index === 0 &&
-                  !legacySingleSelectionWithoutBaseline
+                  !legacySelectionWithoutBaseline
                     ? "baseline"
                     : "interaction",
         })),

@@ -90,6 +90,10 @@ export const buildSelectionTimelineBars = ({
             left,
             width,
             relativeTime: clamp(relativeTime, 0, 1),
+            startValue: startRaw,
+            endValue: endRaw,
+            visibleMin,
+            visibleMax,
             isLatest: index === records.length - 1,
             record,
         };

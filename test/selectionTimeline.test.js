@@ -26,6 +26,10 @@ test("builds PW-style interaction intervals with a visible now endpoint", () => 
     assert.equal(bars.length, 2);
     assert.equal(bars[0].left, 0);
     assert.equal(Math.round(bars[0].width), 33);
+    assert.equal(bars[0].startValue, 0);
+    assert.equal(bars[0].endValue, 1);
+    assert.equal(bars[0].visibleMin, 0);
+    assert.equal(bars[0].visibleMax, 3);
     assert.equal(bars[0].isLatest, false);
     assert.equal(Math.round(bars[1].left), 67);
     assert.equal(Math.round(bars[1].width), 33);

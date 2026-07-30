@@ -70,6 +70,52 @@ test("normalizes the V1 selections format without changing array values", () => 
     assert.equal(result.data[0].timestamp, "2026-07-30T01:02:03.000Z");
 });
 
+test("keeps one-record interacted V1 Multi Select history as interaction", () => {
+    const result = normalizeSerializedProvenance({
+        selections: [{
+            value: ["NY", "LDN", "NY"],
+            timestamp: "2026-07-30T01:02:03.000Z",
+        }],
+        hasUserInteracted: true,
+    }, {
+        ...options,
+        widgetId: "customer-city-multi-filter",
+        widgetType: "multiselect",
+    });
+
+    assert.deepEqual(result.data[0].value, ["NY", "LDN"]);
+    assert.equal(result.data[0].kind, "interaction");
+});
+
+test("rejects invalid V1 Multi Select values", () => {
+    assert.throws(
+        () => normalizeSerializedProvenance({
+            selections: [{
+                value: "NY",
+                timestamp: "2026-07-30T01:02:03.000Z",
+            }],
+        }, {
+            ...options,
+            widgetId: "customer-city-multi-filter",
+            widgetType: "multiselect",
+        }),
+        /arrays of stable string or number keys/
+    );
+    assert.throws(
+        () => normalizeSerializedProvenance({
+            selections: [{
+                value: [{ code: "NY" }],
+                timestamp: "2026-07-30T01:02:03.000Z",
+            }],
+        }, {
+            ...options,
+            widgetId: "customer-city-multi-filter",
+            widgetType: "multiselect",
+        }),
+        /arrays of stable string or number keys/
+    );
+});
+
 test("normalizes V1 Range Slider history as low/high pairs", () => {
     const result = normalizeSerializedProvenance({
         data: [

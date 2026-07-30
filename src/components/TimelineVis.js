@@ -58,6 +58,35 @@ const TimelineVis = ({
         ]
     );
 
+    const restoreBar = (bar, event) => {
+        if (!onRestore) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const bounds =
+            event.currentTarget?.parentElement?.getBoundingClientRect?.();
+        const clientX = Number(event.clientX);
+        const pointerRatio =
+            bounds &&
+            Number.isFinite(clientX) &&
+            bounds.width > 0
+                ? Math.max(
+                    0,
+                    Math.min(1, (clientX - bounds.left) / bounds.width)
+                )
+                : null;
+        const point = pointerRatio === null
+            ? bar.startValue
+            : (
+                bar.visibleMin +
+                pointerRatio * (bar.visibleMax - bar.visibleMin)
+            );
+        onRestore(value, bar.record, event, {
+            point,
+            mode,
+            bar,
+        });
+    };
+
     return (
         <div
             style={{
@@ -107,10 +136,7 @@ const TimelineVis = ({
                                 event.stopPropagation();
                             }}
                             onClick={event => {
-                                if (!onRestore) return;
-                                event.preventDefault();
-                                event.stopPropagation();
-                                onRestore(value, bar.record, event);
+                                restoreBar(bar, event);
                             }}
                             onKeyDown={event => {
                                 if (
@@ -122,9 +148,7 @@ const TimelineVis = ({
                                 ) {
                                     return;
                                 }
-                                event.preventDefault();
-                                event.stopPropagation();
-                                onRestore(value, bar.record, event);
+                                restoreBar(bar, event);
                             }}
                             style={{
                                 ...tooltipProps.style,
