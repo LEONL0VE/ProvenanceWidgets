@@ -136,6 +136,20 @@ const normalizeLegacyValue = (value, widgetType) => {
             );
         }
     }
+    if (
+        widgetType === "dropdown" ||
+        widgetType === "radio-group"
+    ) {
+        if (Array.isArray(value)) {
+            if (value.length > 1) {
+                throw new TypeError(
+                    "Single-selection provenance values must contain " +
+                    "at most one selected key"
+                );
+            }
+            return value[0] ?? null;
+        }
+    }
     return value;
 };
 
@@ -256,6 +270,14 @@ export const normalizeSerializedProvenance = (
     const effectiveWidgetType = isV2
         ? provenance.widgetType ?? widgetType
         : widgetType;
+    const legacySingleSelectionWithoutBaseline =
+        !isV2 &&
+        (
+            effectiveWidgetType === "dropdown" ||
+            effectiveWidgetType === "radio-group"
+        ) &&
+        provenance.hasUserInteracted === true &&
+        rawData.length === 1;
 
     return {
         schemaVersion: PROVENANCE_SCHEMA_VERSION,
@@ -274,7 +296,8 @@ export const normalizeSerializedProvenance = (
             // is part of the temporal line, but does not enable the footprint.
             defaultKind: isV2
                 ? "interaction"
-                : index === 0
+                : index === 0 &&
+                  !legacySingleSelectionWithoutBaseline
                     ? "baseline"
                     : "interaction",
         })),

@@ -122,6 +122,72 @@ test("preserves Input Text strings including an empty search", () => {
     );
 });
 
+test("normalizes V1 Single Select Dropdown keys and clearing", () => {
+    const restored = normalizeSerializedProvenance({
+        selections: [
+            {
+                value: ["NY"],
+                timestamp: "2026-03-01T10:00:00.000Z",
+            },
+            {
+                value: [],
+                timestamp: "2026-03-01T10:00:01.000Z",
+            },
+            {
+                value: ["LDN"],
+                timestamp: "2026-03-01T10:00:02.000Z",
+            },
+        ],
+        hasUserInteracted: true,
+    }, {
+        widgetId: "customer-city-filter",
+        widgetType: "dropdown",
+    });
+
+    assert.deepEqual(
+        restored.data.map(record => [
+            record.value,
+            record.kind,
+        ]),
+        [
+            ["NY", "baseline"],
+            [null, "interaction"],
+            ["LDN", "interaction"],
+        ]
+    );
+});
+
+test("keeps a one-record interacted V1 Dropdown as an interaction", () => {
+    const restored = normalizeSerializedProvenance({
+        selections: [{
+            value: ["LDN"],
+            timestamp: "2026-03-01T10:00:00.000Z",
+        }],
+        hasUserInteracted: true,
+    }, {
+        widgetId: "customer-city-filter",
+        widgetType: "dropdown",
+    });
+
+    assert.equal(restored.data[0].value, "LDN");
+    assert.equal(restored.data[0].kind, "interaction");
+});
+
+test("rejects invalid multi-valued Single Select provenance", () => {
+    assert.throws(
+        () => normalizeSerializedProvenance({
+            selections: [{
+                value: ["NY", "LDN"],
+                timestamp: "2026-03-01T10:00:00.000Z",
+            }],
+        }, {
+            widgetId: "customer-city-filter",
+            widgetType: "dropdown",
+        }),
+        /at most one selected key/
+    );
+});
+
 test("creates a JSON-safe defensive copy of public provenance values", () => {
     const source = {
         range: [20, 40],

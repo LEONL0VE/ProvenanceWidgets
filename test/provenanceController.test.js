@@ -275,6 +275,39 @@ test("records repeated Input Text searches as separate interactions", () => {
     );
 });
 
+test("records scalar dropdown keys, clearing, and history restore", () => {
+    const strategy = createStrategy();
+    const sources = [];
+    const controller = new ProvenanceController({
+        id: "customer-city-filter",
+        widgetType: "dropdown",
+        value: "NY",
+        strategy,
+        onProvenanceChange: (_provenance, meta) =>
+            sources.push(meta.source),
+    });
+
+    assert.equal(controller.getSnapshot().hasProvenance, false);
+    assert.equal(controller.recordInteraction("LDN", {
+        caller: "LDN",
+    }), true);
+    assert.equal(controller.recordInteraction("LDN", {
+        caller: "LDN",
+    }), false);
+    assert.equal(controller.recordInteraction(null, {
+        caller: "LDN",
+    }), true);
+    assert.equal(controller.restoreValue("NY", {
+        caller: "NY",
+    }), true);
+
+    assert.deepEqual(
+        controller.exportProvenance().data.map(record => record.value),
+        ["NY", "LDN", null, "NY"]
+    );
+    assert.deepEqual(sources, ["user", "user", "history"]);
+});
+
 test("can pause and restart time sampling for React lifecycle replay", () => {
     let intervalCount = 0;
     let clearCount = 0;

@@ -1,70 +1,82 @@
 import { useMemo } from "react";
 import { interpolateOranges } from "d3";
 import * as d3 from "d3";
-import { formatTemporalTooltip, getTooltipAnchorProps } from './provenanceTooltip.js';
+import {
+    formatTemporalTooltip,
+    getTooltipAnchorProps,
+} from "./provenanceTooltip.js";
+import {
+    buildSelectionTimelineBars,
+} from "./selectionTimeline.js";
 
 const TimelineVis = ({
     records,
     maxIndex,
+    mode = "interaction",
+    timeDomain,
+    brushRange,
     leftInsetPx = 0,
     tooltipId,
     widgetId,
     value,
-    kind = 'single-selection',
+    kind = "single-selection",
+    onRestore,
 }) => {
-    const bars = useMemo(() => {
-        if (!records || !Array.isArray(records)) return [];
-        
-        const indexOffset = 1;
-        const displayMax = Math.max((maxIndex ?? 0) - indexOffset, 1);
-
-        return records.map((record, i) => {
-            if (!record.select) return null;
-            const startRaw = record.select.index;
-            const endRaw = record.unselect ? record.unselect.index : maxIndex;
-            const start = Math.max(0, (startRaw ?? 0) - indexOffset);
-            const end = Math.max(start, (endRaw ?? maxIndex) - indexOffset);
-            
-            const totalRange = displayMax > 0 ? displayMax : 1;
-            const left = (start / totalRange) * 100;
-            // Use a minimal width if start and end are close, but primarily position based
-            // The user asked to make "The most recent interaction shows up as a very small line, instead of a rectangle"
-            // This happens when width is very small (e.g. 0).
-            // We should enforce a minimum width or use calc.
-            // Let's use a minimum pixel width for visibility.
-            // But we are using %.
-            // Let's ensure at least a small % or use min-width style.
-            
-            const width = Math.max(0, ((end - start) / totalRange) * 100);
-
-            // Color by recency using the same brown-yellow scheme (interpolateOranges)
-            // Most recent (start near maxIndex) -> darker; older -> lighter
-            const relativeTime = totalRange > 0 ? (start / totalRange) : 0;
-            const color = interpolateOranges(0.3 + (relativeTime * 0.7));
-            const borderColor = d3.color(color)?.darker()?.formatHex?.() || "#AA6E00";
-            
+    const bars = useMemo(
+        () => buildSelectionTimelineBars({
+            records,
+            maxIndex,
+            mode,
+            timeDomain,
+            brushRange,
+        }).map(bar => {
+            const recentColor = interpolateOranges(
+                0.3 + (bar.relativeTime * 0.7)
+            );
+            // PW 1.0 keeps old intervals neutral and scents the most recent
+            // interval for each option.
+            const color = bar.isLatest
+                ? recentColor
+                : "#E5E5E5";
+            const borderColor =
+                d3.color(color)?.darker()?.formatHex?.() ??
+                "#AA6E00";
             return {
-                key: i,
-                left: `${left}%`,
-                width: `${width}%`,
-                title: `Start: ${start}, End: ${end}`,
+                ...bar,
+                left: `${bar.left}%`,
+                width: `${bar.width}%`,
                 color,
                 borderColor,
-                record,
             };
-        }).filter(Boolean);
-    }, [records, maxIndex]);
+        }),
+        [
+            records,
+            maxIndex,
+            mode,
+            timeDomain,
+            brushRange,
+        ]
+    );
 
     return (
-        <div style={{ 
-            position: 'relative', 
-            height: '24px', 
-            background: 'transparent', // Removed dark background
-            width: '100%',
-            flex: 1 // Allow it to grow
-        }}>
-            {/* Base line removed as requested */}
-            <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${leftInsetPx}px`, right: 0 }}>
+        <div
+            style={{
+                position: "relative",
+                height: "24px",
+                background: "transparent",
+                width: "100%",
+                flex: 1,
+            }}
+        >
+            <div
+                style={{
+                    position: "absolute",
+                    top: 0,
+                    bottom: 0,
+                    left: `${leftInsetPx}px`,
+                    right: 0,
+                }}
+            >
                 {bars.map(bar => {
                     const tooltipProps = getTooltipAnchorProps(
                         tooltipId,
@@ -77,24 +89,60 @@ const TimelineVis = ({
                     );
 
                     return (
-                    <div
-                        key={bar.key}
-                        data-provenance-timeline-bar="true"
-                        {...tooltipProps}
-                        style={{
-                            ...tooltipProps.style,
-                            position: 'absolute',
-                            left: bar.left,
-                            width: bar.width,
-                            minWidth: '8px', // Match PW's practical hover target for short durations
-                            height: '24px',
-                            top: '0px',
-                            backgroundColor: bar.color, // Orange scale by recency
-                            opacity: 1.0, // Solid opacity
-                            border: `1px solid ${bar.borderColor}`, // Slight border for definition
-                            zIndex: 0 // Behind text if needed, or allow text to be on top
-                        }}
-                    />
+                        <div
+                            key={bar.key}
+                            data-provenance-timeline-bar="true"
+                            data-provenance-temporal-value={value}
+                            {...tooltipProps}
+                            role={onRestore ? "button" : undefined}
+                            tabIndex={onRestore ? 0 : undefined}
+                            aria-label={
+                                onRestore
+                                    ? `Restore ${widgetId} to ${value}`
+                                    : undefined
+                            }
+                            onMouseDown={event => {
+                                if (!onRestore) return;
+                                event.preventDefault();
+                                event.stopPropagation();
+                            }}
+                            onClick={event => {
+                                if (!onRestore) return;
+                                event.preventDefault();
+                                event.stopPropagation();
+                                onRestore(value, bar.record, event);
+                            }}
+                            onKeyDown={event => {
+                                if (
+                                    !onRestore ||
+                                    (
+                                        event.key !== "Enter" &&
+                                        event.key !== " "
+                                    )
+                                ) {
+                                    return;
+                                }
+                                event.preventDefault();
+                                event.stopPropagation();
+                                onRestore(value, bar.record, event);
+                            }}
+                            style={{
+                                ...tooltipProps.style,
+                                position: "absolute",
+                                left: bar.left,
+                                width: bar.width,
+                                minWidth: "8px",
+                                height: "24px",
+                                top: 0,
+                                backgroundColor: bar.color,
+                                opacity: 1,
+                                border: `1px solid ${bar.borderColor}`,
+                                zIndex: 0,
+                                cursor: onRestore
+                                    ? "pointer"
+                                    : "default",
+                            }}
+                        />
                     );
                 })}
             </div>

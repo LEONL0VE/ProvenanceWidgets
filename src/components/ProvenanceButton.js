@@ -100,18 +100,7 @@ const ProvenanceButton = ({ target }) => {
 
     const handleToggle = () => {
         if (isDisabled) return;
-        
-        const newOpen = !open;
-        setOpen(newOpen);
-        
-        // If it's a dropdown or input-text or range-slider, we want to programmatically open the adjacent dropdown component
-        // The dropdown component has the same ID as `target` or is related to it.
-        if (isDropdown) {
-            const event = new CustomEvent('provenance-dropdown-toggle', { 
-                detail: { target, open: newOpen } 
-            });
-            window.dispatchEvent(event);
-        }
+        setOpen(!open);
     };
     
     // For selection groups, we no longer render the chart body here.
@@ -148,6 +137,21 @@ const ProvenanceButton = ({ target }) => {
             window.dispatchEvent(event);
         }
     }, [open, target, isDropdown]);
+
+    useEffect(() => {
+        const handleVisibility = event => {
+            if (event.detail?.target !== target) return;
+            setOpen(Boolean(event.detail.open));
+        };
+        window.addEventListener(
+            "provenance-dropdown-visibility",
+            handleVisibility
+        );
+        return () => window.removeEventListener(
+            "provenance-dropdown-visibility",
+            handleVisibility
+        );
+    }, [target]);
 
     useEffect(() => {
         if (buttonState === "hidden" && open) {

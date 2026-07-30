@@ -365,6 +365,29 @@ test("uses registration type for single and multiple selection replay", () => {
     );
 });
 
+test("uses dropdown metadata for custom-id Super replay", () => {
+    const provenance = {
+        detailedData: new Map([
+            ["NY", [{
+                select: { time: time(1), index: 1 },
+                unselect: { time: time(2), index: 2 },
+            }]],
+            ["LDN", [{
+                select: { time: time(2), index: 2 },
+            }]],
+        ]),
+    };
+
+    assert.deepEqual(
+        getRegisteredWidgetValueAtTime({
+            id: "customer-city-filter",
+            type: "dropdown",
+            provenance,
+        }, time(3)),
+        { found: true, value: "LDN" }
+    );
+});
+
 test("Super timeline replay calls each registration setValue with history source", () => {
     const restored = [];
     const registrations = new Map([
