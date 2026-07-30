@@ -248,6 +248,33 @@ test("records and restores Range Slider values as one low/high interaction", () 
     );
 });
 
+test("records repeated Input Text searches as separate interactions", () => {
+    const strategy = createStrategy();
+    const controller = new ProvenanceController({
+        id: "query",
+        widgetType: "input-text",
+        value: undefined,
+        strategy,
+        valuesEqual: () => false,
+    });
+
+    assert.equal(controller.recordInteraction("pizza"), true);
+    assert.equal(controller.recordInteraction("pizza"), true);
+
+    assert.deepEqual(
+        controller.exportProvenance().data.map(record => record.value),
+        ["pizza", "pizza"]
+    );
+    assert.deepEqual(
+        controller.exportProvenance().data.map(record => record.kind),
+        ["interaction", "interaction"]
+    );
+    assert.deepEqual(
+        strategy.inserts.map(insert => insert.value),
+        ["pizza", "pizza"]
+    );
+});
+
 test("can pause and restart time sampling for React lifecycle replay", () => {
     let intervalCount = 0;
     let clearCount = 0;

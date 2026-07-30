@@ -18,6 +18,10 @@ import {
     normalizeTemporalBrush,
     restoreTemporalPoint,
 } from './singleSliderTemporal.js';
+import {
+    buildInputTextTemporalEntries,
+    restoreInputTextTemporalValue,
+} from './inputTextValue.js';
 
 const TEMPORAL_BRUSH_HEIGHT = 240;
 
@@ -186,6 +190,7 @@ const Chart = ({
     part = "full",
     theme = "dark",
     provenance,
+    provenanceStrategy,
     mode = "interaction",
     temporalBrush = false,
 }) => {
@@ -209,9 +214,11 @@ const Chart = ({
         if (!target) return null;
 
         // Get the component data based on target (Map first, fallback to plain object)
-        const componentData = registeredComponents instanceof Map
-            ? registeredComponents.get(target)
-            : registeredComponents?.[target];
+        const componentData = provenanceStrategy ?? (
+            registeredComponents instanceof Map
+                ? registeredComponents.get(target)
+                : registeredComponents?.[target]
+        );
         if (!componentData) return null;
 
         const domain = componentData.domain instanceof Map
@@ -403,51 +410,122 @@ const Chart = ({
         }
 
         if (isTextProvenance) {
-            // Transform linear history to grouped history
-            const sorted = detailedDataEntries.sort((a, b) => a[0] - b[0]);
+            const publicRecords =
+                provenance?.widgetType === "input-text" &&
+                Array.isArray(provenance.data)
+                    ? provenance.data.map((record, recordIndex) => [
+                        recordIndex + 1,
+                        {
+                            value: record.value,
+                            time: new Date(record.timestamp),
+                            index: recordIndex + 1,
+                            kind: record.kind,
+                            source: record.source,
+                        },
+                    ])
+                    : [];
+            // Public records contain the live sample endpoint in time mode.
+            const sorted = (
+                publicRecords.length > 0
+                    ? publicRecords
+                    : detailedDataEntries
+            ).sort((a, b) => a[0] - b[0]);
             const grouped = new Map();
-            
             const sequenceOffset = componentData.tooltipIndexOffset ?? 1;
-            const sequenceTotal = Math.max(0, sorted.length - sequenceOffset);
+            const hasRecordKinds = sorted.some(
+                ([, record]) => record.kind !== undefined
+            );
+            const sequenceTotal = hasRecordKinds
+                ? sorted.filter(
+                    ([, record]) => record.kind === "interaction"
+                ).length
+                : Math.max(0, sorted.length - sequenceOffset);
+            let interactionIndex = 0;
+            const inputTextEntries = buildInputTextTemporalEntries({
+                sortedRecords: sorted,
+                hasRecordKinds,
+                sequenceOffset,
+                sequenceTotal,
+            });
 
             if (sorted.length > 0) {
-                let currentVal = sorted[0][1].value;
-                let startIndex = sorted[0][1].index;
-                
+                const firstRecord = sorted[0][1];
+                let currentVal = firstRecord.value;
+                const startIndex = firstRecord.index;
+                const startPosition = mode === "time"
+                    ? firstRecord.time.getTime()
+                    : firstRecord.index;
+                if (
+                    firstRecord.kind === undefined ||
+                    firstRecord.kind === "interaction"
+                ) {
+                    interactionIndex += 1;
+                }
+
                 // Add first start
                 if (!grouped.has(currentVal)) grouped.set(currentVal, []);
                 grouped.get(currentVal).push({
-                    select: { index: startIndex, time: sorted[0][1].time },
+                    select: {
+                        index: startPosition,
+                        time: firstRecord.time,
+                    },
                     value: currentVal,
-                    sequenceIndex: Math.max(0, startIndex - sequenceOffset),
+                    time: firstRecord.time,
+                    kind: firstRecord.kind,
+                    source: firstRecord.source,
+                    sequenceIndex: hasRecordKinds
+                        ? interactionIndex
+                        : Math.max(
+                            0,
+                            startIndex - sequenceOffset
+                        ),
                     sequenceTotal,
                 });
-                
+
                 for (let i = 1; i < sorted.length; i++) {
                     const nextRec = sorted[i][1];
                     const nextVal = nextRec.value;
                     const nextIndex = nextRec.index;
+                    const nextPosition = mode === "time"
+                        ? nextRec.time.getTime()
+                        : nextIndex;
+                    if (
+                        nextRec.kind === undefined ||
+                        nextRec.kind === "interaction"
+                    ) {
+                        interactionIndex += 1;
+                    }
 
                     // Every search is a separate PW interaction, even when the
                     // same value is searched twice in succession.
                     const currentRecords = grouped.get(currentVal);
                     if (currentRecords && currentRecords.length > 0) {
                         currentRecords[currentRecords.length - 1].unselect = {
-                            index: nextIndex,
+                            index: nextPosition,
                             time: nextRec.time,
                         };
                     }
 
                     if (!grouped.has(nextVal)) grouped.set(nextVal, []);
                     grouped.get(nextVal).push({
-                        select: { index: nextIndex, time: nextRec.time },
+                        select: {
+                            index: nextPosition,
+                            time: nextRec.time,
+                        },
                         value: nextVal,
-                        sequenceIndex: Math.max(0, nextIndex - sequenceOffset),
+                        time: nextRec.time,
+                        kind: nextRec.kind,
+                        source: nextRec.source,
+                        sequenceIndex: hasRecordKinds
+                            ? interactionIndex
+                            : Math.max(
+                                0,
+                                nextIndex - sequenceOffset
+                            ),
                         sequenceTotal,
                     });
 
                     currentVal = nextVal;
-                    startIndex = nextIndex;
                 }
             }
 
@@ -462,15 +540,35 @@ const Chart = ({
             }
             
             const currentDomainMax = indexDomain ? indexDomain[1] : 0;
+            const temporalPositions = mode === "time"
+                ? sorted.map(([, record]) => record.time.getTime())
+                : [];
+            const temporalMin = temporalPositions.length > 0
+                ? Math.min(...temporalPositions)
+                : 0;
+            const temporalMax = temporalPositions.length > 0
+                ? Math.max(...temporalPositions)
+                : 0;
             const effectiveMax = Math.max(currentDomainMax, dataMaxIndex);
+            const textDomain = mode === "time"
+                ? [
+                    temporalMin,
+                    temporalMax > temporalMin
+                        ? temporalMax
+                        : temporalMin + 1,
+                ]
+                : [0, effectiveMax];
 
             return {
                 componentData,
                 detailedDataEntries: Array.from(grouped.entries()),
-                indexDomain: [0, effectiveMax], // Force extend domain
+                inputTextEntries,
+                indexDomain: textDomain,
                 isCheckboxGroup: true,
+                isInputText: true,
                 tooltipKind: 'input',
                 tooltipLabel: componentData.tooltipLabel ?? target,
+                mode,
             };
         }
 
@@ -554,7 +652,13 @@ const Chart = ({
             tooltipKind,
             tooltipLabel: componentData.tooltipLabel ?? target,
         };
-    }, [target, registeredComponents, provenance, mode]);
+    }, [
+        target,
+        registeredComponents,
+        provenance,
+        provenanceStrategy,
+        mode,
+    ]);
 
     // ... useEffect for D3 ...
 
@@ -589,6 +693,16 @@ const Chart = ({
             chartData.mode ?? mode,
             TEMPORAL_BRUSH_HEIGHT
         );
+        const inputTextEntries = chartData.inputTextEntries ?? [];
+        const inputTextPlotHeight = Math.max(
+            48,
+            inputTextEntries.length * 32
+        );
+        const inputTextYPositions = getTemporalYPositions(
+            inputTextEntries,
+            chartData.mode ?? mode,
+            inputTextPlotHeight
+        );
         
         // Calculate max index from data if domain is missing or to ensure bounds
         let calculatedMax = 0;
@@ -601,14 +715,23 @@ const Chart = ({
         
         const domainMax = indexDomain ? indexDomain[1] : 0;
         const domainMin = indexDomain ? indexDomain[0] : 0;
+        const usesContinuousDomain =
+            chartData.isRangeSlider ||
+            chartData.isSingleSlider ||
+            (
+                chartData.isInputText &&
+                (chartData.mode ?? mode) === "time"
+            );
         // For range slider, we use domain max. For others, ensure "now" is beyond the last event so open intervals have visible width.
-        const baseMaxIndex = (chartData.isRangeSlider || chartData.isSingleSlider)
+        const baseMaxIndex = usesContinuousDomain
             ? domainMax
             : Math.max(domainMax, calculatedMax, 1);
-        const maxIndex = (chartData.isRangeSlider || chartData.isSingleSlider) ? baseMaxIndex : baseMaxIndex + 1;
-        const minIndex = (chartData.isRangeSlider || chartData.isSingleSlider) ? domainMin : 0;
+        const maxIndex = usesContinuousDomain
+            ? baseMaxIndex
+            : baseMaxIndex + 1;
+        const minIndex = usesContinuousDomain ? domainMin : 0;
         const rangeSpan = maxIndex - minIndex;
-        const indexOffset = (chartData.isRangeSlider || chartData.isSingleSlider) ? 0 : 1;
+        const indexOffset = usesContinuousDomain ? 0 : 1;
         const displayMaxIndex = Math.max(maxIndex - indexOffset, 1);
         const displaySpan = displayMaxIndex - minIndex;
 
@@ -620,6 +743,7 @@ const Chart = ({
         const rowBg = isLight ? "#f5f5f5" : "#444"; // Background for timeline track
 
         const renderHeader = () => {
+            if (chartData.isInputText) return null;
             const hasLeftAxisLabel = chartData.isRangeSlider || chartData.isSingleSlider;
             const brushWidth = brushEnabled ? 64 : 0;
             const leftLabelWidth = hasLeftAxisLabel
@@ -642,17 +766,221 @@ const Chart = ({
                     {/* The Labels below */}
                     <div style={{ width: innerWidthCalc, marginLeft: innerMarginLeft, display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
                         <span style={{ fontSize: '12px', color: labelColor, fontWeight: 'bold' }}>
-                           {(chartData.isRangeSlider || chartData.isSingleSlider) ? minIndex : "n=0"}
+                           {chartData.isInputText &&
+                           (chartData.mode ?? mode) === "time"
+                               ? "t=0"
+                               : (
+                                   chartData.isRangeSlider ||
+                                   chartData.isSingleSlider
+                               )
+                                   ? minIndex
+                                   : "n=0"}
                         </span>
                         <span style={{ fontSize: '12px', color: labelColor, fontWeight: 'bold' }}>
-                           {(chartData.isRangeSlider || chartData.isSingleSlider) ? maxIndex : "now"}
+                           {chartData.isRangeSlider ||
+                           chartData.isSingleSlider
+                               ? maxIndex
+                               : "now"}
                         </span>
                     </div>
                 </div>
             );
         };
 
-        const renderBody = () => (
+        const renderInputTextBody = () => (
+            <div
+                data-provenance-chart-target={target}
+                style={{
+                    display: "flex",
+                    alignItems: "stretch",
+                    maxHeight: "300px",
+                    overflowY: "auto",
+                }}
+            >
+                <div
+                    style={{
+                        position: "relative",
+                        flex: "0 0 48px",
+                        minHeight: `${inputTextPlotHeight}px`,
+                        color: "#6c757d",
+                    }}
+                >
+                    <div
+                        style={{
+                            position: "absolute",
+                            inset: "8px auto 8px 0",
+                            writingMode: "vertical-rl",
+                            transform: "rotate(180deg)",
+                            fontSize: "11px",
+                            fontWeight: "bold",
+                            textAlign: "center",
+                        }}
+                    >
+                        {(chartData.mode ?? mode) === "time"
+                            ? "time"
+                            : "Sequence of Interactions"}
+                    </div>
+                    <span
+                        style={{
+                            position: "absolute",
+                            right: 0,
+                            top: 0,
+                            fontSize: "10px",
+                        }}
+                    >
+                        {(chartData.mode ?? mode) === "time"
+                            ? "t=0"
+                            : "0"}
+                    </span>
+                    <span
+                        style={{
+                            position: "absolute",
+                            right: 0,
+                            bottom: 0,
+                            fontSize: "10px",
+                        }}
+                    >
+                        {(chartData.mode ?? mode) === "time"
+                            ? "now"
+                            : Math.max(
+                                0,
+                                inputTextEntries.length - 1
+                            )}
+                    </span>
+                </div>
+                <div
+                    style={{
+                        position: "relative",
+                        flex: 1,
+                        minWidth: 0,
+                        height: `${inputTextPlotHeight}px`,
+                    }}
+                >
+                    <svg
+                        aria-hidden="true"
+                        width="24"
+                        height={inputTextPlotHeight}
+                        style={{
+                            position: "absolute",
+                            inset: "0 auto 0 0",
+                            overflow: "visible",
+                            pointerEvents: "none",
+                        }}
+                    >
+                        {inputTextYPositions
+                            .slice(0, -1)
+                            .map((position, index) => (
+                                <line
+                                    key={index}
+                                    x1="12"
+                                    x2="12"
+                                    y1={position}
+                                    y2={
+                                        inputTextYPositions[
+                                            index + 1
+                                        ]
+                                    }
+                                    stroke="#495057"
+                                    strokeWidth="2"
+                                />
+                            ))}
+                    </svg>
+                    {inputTextEntries.map(([, records], index) => {
+                        const record = records[0];
+                        const value = record.value;
+                        const relativeIndex =
+                            index /
+                            (inputTextEntries.length - 1 || 1);
+                        const color = interpolateOranges(
+                            0.3 + (relativeIndex * 0.7)
+                        );
+                        const tooltipProps = getTooltipAnchorProps(
+                            tooltipId,
+                            () => formatTemporalTooltip({
+                                label: chartData.tooltipLabel,
+                                value,
+                                record,
+                                kind: "input",
+                            })
+                        );
+
+                        return (
+                            <div
+                                key={`${index}-${value}`}
+                                style={{
+                                    position: "absolute",
+                                    top:
+                                        `${inputTextYPositions[index] - 8}px`,
+                                    left: 0,
+                                    right: 0,
+                                    height: "24px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                }}
+                            >
+                                <button
+                                    {...tooltipProps}
+                                    type="button"
+                                    data-provenance-temporal-value={
+                                        value
+                                    }
+                                    aria-label={
+                                        `Restore ${chartData.tooltipLabel} ` +
+                                        `to ${value === ""
+                                            ? "<empty>"
+                                            : value}`
+                                    }
+                                    onClick={() =>
+                                        restoreInputTextTemporalValue({
+                                            restoreWidgetValue,
+                                            target,
+                                            value,
+                                        })
+                                    }
+                                    style={{
+                                        ...tooltipProps.style,
+                                        position: "relative",
+                                        flex: "0 0 16px",
+                                        width: "16px",
+                                        height: "16px",
+                                        margin: "0 8px 0 4px",
+                                        padding: 0,
+                                        borderRadius: "50%",
+                                        border:
+                                            `1px solid ${d3
+                                                .color(color)
+                                                .darker()}`,
+                                        backgroundColor: color,
+                                        cursor: "pointer",
+                                        opacity:
+                                            record.kind === "sample"
+                                                ? 0.7
+                                                : 1,
+                                    }}
+                                />
+                                <span
+                                    title={value}
+                                    style={{
+                                        minWidth: 0,
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                        fontSize: "12px",
+                                        color: textColor,
+                                    }}
+                                >
+                                    {value === "" ? "<empty>" : value}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+
+        const renderBody = () => chartData.isInputText
+            ? renderInputTextBody()
+            : (
              <div
                  data-provenance-chart-target={target}
                  style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start' }}
@@ -1020,20 +1348,82 @@ const Chart = ({
                                                })
                                            );
                                            
-                                           return (
+                                            return (
                                                <div
                                                   key={i}
                                                   {...tooltipProps}
+                                                  role={
+                                                      chartData.isInputText
+                                                          ? "button"
+                                                          : undefined
+                                                  }
+                                                  tabIndex={
+                                                      chartData.isInputText
+                                                          ? 0
+                                                          : undefined
+                                                  }
+                                                  data-provenance-temporal-value={
+                                                      chartData.isInputText
+                                                          ? record.value
+                                                          : undefined
+                                                  }
+                                                  aria-label={
+                                                      chartData.isInputText
+                                                          ? (
+                                                              `Restore ${chartData.tooltipLabel} ` +
+                                                              `to ${record.value === ""
+                                                                  ? "<empty>"
+                                                                  : record.value}`
+                                                          )
+                                                          : undefined
+                                                  }
+                                                  onClick={
+                                                      chartData.isInputText
+                                                          ? () =>
+                                                              restoreInputTextTemporalValue({
+                                                                  restoreWidgetValue,
+                                                                  target,
+                                                                  value:
+                                                                      record.value,
+                                                              })
+                                                          : undefined
+                                                  }
+                                                  onKeyDown={
+                                                      chartData.isInputText
+                                                          ? event => {
+                                                              if (
+                                                                  event.key === "Enter" ||
+                                                                  event.key === " "
+                                                              ) {
+                                                                  event.preventDefault();
+                                                                  restoreInputTextTemporalValue({
+                                                                      restoreWidgetValue,
+                                                                      target,
+                                                                      value:
+                                                                          record.value,
+                                                                  });
+                                                              }
+                                                          }
+                                                          : undefined
+                                                  }
                                                   style={{
-                                                   ...tooltipProps.style,
-                                                   position: 'absolute',
+                                                    ...tooltipProps.style,
+                                                    position: 'absolute',
                                                    left: `${left}%`,
                                                    width: `${width}%`,
                                                    minWidth: '8px',
-                                                   height: '100%',
-                                                   backgroundColor: color, 
-                                                   border: `1px solid ${d3.color(color).darker()}`
-                                               }} />
+                                                    height: '100%',
+                                                    backgroundColor: color,
+                                                    border: `1px solid ${d3.color(color).darker()}`,
+                                                    cursor:
+                                                        chartData.isInputText
+                                                            ? 'pointer'
+                                                            : 'default',
+                                                    opacity:
+                                                        record.kind === "sample"
+                                                            ? 0.7
+                                                            : 1,
+                                                }} />
                                            );
                                       })}
                                   </div>

@@ -98,6 +98,30 @@ test("normalizes V1 Range Slider history as low/high pairs", () => {
     );
 });
 
+test("preserves Input Text strings including an empty search", () => {
+    const result = normalizeSerializedProvenance({
+        data: [
+            {
+                value: "",
+                timestamp: "2026-07-30T01:02:03.000Z",
+            },
+            {
+                value: "pizza",
+                timestamp: "2026-07-30T01:02:04.000Z",
+            },
+        ],
+    }, {
+        ...options,
+        widgetId: "query",
+        widgetType: "input-text",
+    });
+
+    assert.deepEqual(
+        result.data.map(record => record.value),
+        ["", "pizza"]
+    );
+});
+
 test("creates a JSON-safe defensive copy of public provenance values", () => {
     const source = {
         range: [20, 40],
