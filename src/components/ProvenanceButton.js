@@ -4,11 +4,17 @@ import { Tooltip } from 'react-tooltip';
 import Chart from "./Chart.js"
 import useProvenance from './hooks/useProvenance.js';
 import useWidgetColors from './hooks/useWidgetColors.js';
+import useWidgetRegistry from './hooks/useWidgetRegistry.js';
+import {
+    getProvenanceButtonState,
+    isInsideProvenanceInteraction,
+} from './provenanceButtonState.js';
 
 const ProvenanceButton = ({ target }) => {
     const [open, setOpen] = useState()
     const [registeredComponents, setRegisteredComponents] = useProvenance()
     const [widgetColors] = useWidgetColors()
+    const { registrations } = useWidgetRegistry();
     const buttonRef = useRef(null);
 
     // Get border color from widgetColors state (set by AggregateView)
@@ -19,10 +25,12 @@ const ProvenanceButton = ({ target }) => {
     const backgroundColor = open && borderColor ? borderColor : null;
 
     const handleClickOutside = (event) => {
-        if (buttonRef.current && !buttonRef.current.contains(event.target)) {
-            console.log('Clicked outside the button!');
-            setOpen(false); // Example action: hide content
-        }
+        if (isInsideProvenanceInteraction({
+            eventTarget: event.target,
+            buttonElement: buttonRef.current,
+            target,
+        })) return;
+        setOpen(false);
     };
 
     useEffect(() => {
@@ -31,7 +39,7 @@ const ProvenanceButton = ({ target }) => {
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, []);
+    }, [target]);
 
     const TEMPORAL_B64 = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+DQo8c3ZnIHZlcnNpb249IjEuMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgdmlld0JveD0iLTMgLTMgNjcuNDg3IDEwNiIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQogIDxnPg0KICA8cGF0aCBzdHJva2U9IiMyYzNlNTAiIHN0cm9rZS13aWR0aD0iNXB4IiBmaWxsPSIjMmMzZTUwIiBkPSJNMzcuMjY3LDgzLjY4MWMtMi4zNDYsNS45MzItNC4xMzMsMTQuMTgzLDIuNjU1LDE1Ljk5YzEwLjQyNywyLjc3MiwxMS45MDctMTIuODk2LDExLjkwNy0xMi44OTYNCglMMzcuMjY3LDgzLjY4MXoiLz4NCiAgPHBhdGggc3Ryb2tlPSIjMmMzZTUwIiBzdHJva2Utd2lkdGg9IjVweCIgZmlsbD0iIzJjM2U1MCIgZD0iTTYwLjc0Miw2My4zODZjMS41NTgtOC4xMTQsMS40NjctMjEuOTU3LTguMjcxLTI1LjM5NGMtMi40LTAuODQ4LTExLjQ2Ny0zLjAwNi0xNS4xMjYsMTIuOTU2DQoJYy0yLjY1MSwxMS42MTIsMS40ODgsMjUuNTM5LDEuNDg4LDI1LjUzOWwxNC43MjUsMy4xMzJDNTMuNTYsNzkuNjE4LDU5LjY5OCw2OC44MTQsNjAuNzQyLDYzLjM4NnoiLz4NCiAgPHBhdGggc3Ryb2tlPSIjMmMzZTUwIiBzdHJva2Utd2lkdGg9IjVweCIgZmlsbD0iIzJjM2U1MCIgZD0iTTIxLjM2Niw0Ny4zMTljMS43MTYsNi4xNDIsMi42MzMsMTQuNTM0LTQuMzExLDE1LjYyM0M2LjQsNjQuNjExLDYuNTY1LDQ4Ljg3NSw2LjU2NSw0OC44NzVMMjEuMzY2LDQ3LjMxOXoNCgkiLz4NCiAgPHBhdGggc3Ryb2tlPSIjMmMzZTUwIiBzdHJva2Utd2lkdGg9IjVweCIgZmlsbD0iIzJjM2U1MCIgZD0iTTAuMTQ2LDI0LjY3OUMtMC41NTUsMTYuNDQ3LDAuOTgsMi42OSwxMS4wMjgsMC4yODdDMTMuNS0wLjMwNiwyMi43NDEtMS41MDEsMjQuNzExLDE0Ljc1NQ0KCWMxLjQzMSwxMS44MjctNC4xNTEsMjUuMjQzLTQuMTUxLDI1LjI0M2wtMTQuOTcsMS41NzVDNS41ODksNDEuNTczLDAuNjEyLDMwLjE5LDAuMTQ2LDI0LjY3OXoiLz4NCiAgICA8L2c+DQo8L3N2Zz4="
     const AGGREGATE_B64 = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+DQo8c3ZnIHZlcnNpb249IjEuMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgdmlld0JveD0iLTMgLTMgNjcuNDg3IDEwNiIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQogIDxnPg0KICA8cGF0aCBzdHJva2U9IiMyYzNlNTAiIHN0cm9rZS13aWR0aD0iNXB4IiBmaWxsPSJub25lIiBkPSJNMzcuMjY3LDgzLjY4MWMtMi4zNDYsNS45MzItNC4xMzMsMTQuMTgzLDIuNjU1LDE1Ljk5YzEwLjQyNywyLjc3MiwxMS45MDctMTIuODk2LDExLjkwNy0xMi44OTYNCglMMzcuMjY3LDgzLjY4MXoiLz4NCiAgPHBhdGggc3Ryb2tlPSIjMmMzZTUwIiBzdHJva2Utd2lkdGg9IjVweCIgZmlsbD0ibm9uZSIgZD0iTTYwLjc0Miw2My4zODZjMS41NTgtOC4xMTQsMS40NjctMjEuOTU3LTguMjcxLTI1LjM5NGMtMi40LTAuODQ4LTExLjQ2Ny0zLjAwNi0xNS4xMjYsMTIuOTU2DQoJYy0yLjY1MSwxMS42MTIsMS40ODgsMjUuNTM5LDEuNDg4LDI1LjUzOWwxNC43MjUsMy4xMzJDNTMuNTYsNzkuNjE4LDU5LjY5OCw2OC44MTQsNjAuNzQyLDYzLjM4NnoiLz4NCiAgPHBhdGggc3Ryb2tlPSIjMmMzZTUwIiBzdHJva2Utd2lkdGg9IjVweCIgZmlsbD0ibm9uZSIgZD0iTTIxLjM2Niw0Ny4zMTljMS43MTYsNi4xNDIsMi42MzMsMTQuNTM0LTQuMzExLDE1LjYyM0M2LjQsNjQuNjExLDYuNTY1LDQ4Ljg3NSw2LjU2NSw0OC44NzVMMjEuMzY2LDQ3LjMxOXoNCgkiLz4NCiAgPHBhdGggc3Ryb2tlPSIjMmMzZTUwIiBzdHJva2Utd2lkdGg9IjVweCIgZmlsbD0ibm9uZSIgZD0iTTAuMTQ2LDI0LjY3OUMtMC41NTUsMTYuNDQ3LDAuOTgsMi42OSwxMS4wMjgsMC4yODdDMTMuNS0wLjMwNiwyMi43NDEtMS41MDEsMjQuNzExLDE0Ljc1NQ0KCWMxLjQzMSwxMS44MjctNC4xNTEsMjUuMjQzLTQuMTUxLDI1LjI0M2wtMTQuOTcsMS41NzVDNS41ODksNDEuNTczLDAuNjEyLDMwLjE5LDAuMTQ2LDI0LjY3OXoiLz4NCiAgICA8L2c+DQo8L3N2Zz4="
@@ -39,13 +47,13 @@ const ProvenanceButton = ({ target }) => {
 
     // Check if component is registered and has interactions
     const provenance = registeredComponents.get(target);
-    const hasInteractions = provenance &&
-        provenance.detailedData &&
-        provenance.detailedData.size > 0 &&
-        // SS/RS retain an internal baseline like PW 1.0, but that baseline is
-        // not itself a user interaction and must not enable the footprint.
-        provenance.hasUserInteracted !== false;
-    const isDisabled = !provenance || !hasInteractions;
+    const registration = registrations.get(target);
+    const buttonState = getProvenanceButtonState({
+        provenance,
+        visualize: registration?.visualize ?? true,
+        open: Boolean(open),
+    });
+    const isDisabled = buttonState === "disabled";
 
     // Check if this is a checkbox/radio group to render in-situ (Timeline)
     // We EXCLUDE single-select dropdowns from this "isSelectionGroup" logic
@@ -54,7 +62,15 @@ const ProvenanceButton = ({ target }) => {
         if (!provenance || !provenance.detailedData) return false;
         
         // Explicitly exclude dropdowns from in-situ rendering
-        if (typeof target === 'string' && target.includes('dropdown')) {
+        if (
+            registration?.type === "dropdown" ||
+            registration?.type === "multiselect" ||
+            (
+                !registration &&
+                typeof target === 'string' &&
+                target.includes('dropdown')
+            )
+        ) {
             return false;
         }
 
@@ -67,12 +83,20 @@ const ProvenanceButton = ({ target }) => {
 
     // Check if this is a dropdown
     // This now includes 'input-text', 'range-slider', and 'single-slider' because we want to trigger a dropdown-style view for them too.
-    const isDropdown = typeof target === 'string' && (
-        target.includes('dropdown') ||
-        target === 'input-text' ||
-        target === 'range-slider' ||
-        target === 'single-slider'
-    );
+    const isDropdown = registration
+        ? [
+            "dropdown",
+            "multiselect",
+            "input-text",
+            "range-slider",
+            "single-slider",
+        ].includes(registration.type)
+        : typeof target === 'string' && (
+            target.includes('dropdown') ||
+            target === 'input-text' ||
+            target === 'range-slider' ||
+            target === 'single-slider'
+        );
 
     const handleToggle = () => {
         if (isDisabled) return;
@@ -125,14 +149,21 @@ const ProvenanceButton = ({ target }) => {
         }
     }, [open, target, isDropdown]);
 
+    useEffect(() => {
+        if (buttonState === "hidden" && open) {
+            setOpen(false);
+        }
+    }, [buttonState, open]);
+
     // Determine which icon to show
     const getIcon = () => {
         // Show disabled if component is not registered or has no interactions
-        if (isDisabled) {
+        if (buttonState === "disabled") {
             return DISABLED_B64;
         }
-        // Show active icons only if component has interactions
-        return open ? TEMPORAL_B64 : AGGREGATE_B64;
+        return buttonState === "temporal"
+            ? TEMPORAL_B64
+            : AGGREGATE_B64;
     };
 
     // Build button style - set background color to border color when open
@@ -160,6 +191,8 @@ const ProvenanceButton = ({ target }) => {
         } : {})
     };
 
+    if (buttonState === "hidden") return null;
+
     return (
         <div style={{ display: "flex", flexDirection: "column", marginTop: "1rem", position: 'relative' }}>
             <style>{`
@@ -173,6 +206,7 @@ const ProvenanceButton = ({ target }) => {
                     <Button 
                         ref={buttonRef} 
                         className="provenance-button"
+                        data-provenance-state={buttonState}
                         data-tooltip-id={(!isSelectionGroup && !isDropdown) ? "open-tooltip-" + target : undefined}
                         onClick={handleToggle} 
                         disabled={isDisabled}

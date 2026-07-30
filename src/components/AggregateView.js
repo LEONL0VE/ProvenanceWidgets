@@ -4,8 +4,14 @@ import { Tooltip } from 'react-tooltip';
 import Chart from "./Chart.js"
 import useProvenance from './hooks/useProvenance.js';
 import useWidgetColors from './hooks/useWidgetColors.js';
+import useWidgetRegistry from './hooks/useWidgetRegistry.js';
+import { getRegistrationElement } from '../controllers/widgetRegistry.js';
 import { scaleOrdinal } from 'd3-scale';
 import { schemeCategory10 } from 'd3-scale-chromatic';
+import {
+    buildSuperAggregateBoxes,
+    getSuperWidgetColorMap,
+} from './superProvenanceData.js';
 
 // Helper function to convert hex color to rgba with alpha
 const hexToRgba = (hex, alpha) => {
@@ -19,6 +25,7 @@ const AggregateView = ({ target }) => {
     const [open, setOpen] = useState()
     const [registeredComponents, setRegisteredComponents] = useProvenance()
     const [widgetColors, setWidgetColors] = useWidgetColors()
+    const { registrations, focusWidget } = useWidgetRegistry();
     const buttonRef = useRef(null);
     const [coloredBoxes, setColoredBoxes] = useState([])
     const intervalRef = useRef(null);
@@ -39,104 +46,28 @@ const AggregateView = ({ target }) => {
             if (registeredComponents.size !== 0) {
                 const sp = registeredComponents.get(target);
                 if (sp && sp.registeredWidgets) {
-                    const widgetSize = sp.registeredWidgets.size;
-                    if (widgetSize !== 0) {
-                        const boxes = [];
-                        const widgetIds = Array.from(sp.registeredWidgets.keys());
-                        const interactionCounts = [];
+                    const colorMap = getSuperWidgetColorMap(
+                        sp,
+                        index => colorScale(index)
+                    );
+                    setWidgetColors(previous => {
+                        const changed = Object.entries(colorMap).some(
+                            ([widgetId, color]) =>
+                                previous[widgetId] !== color
+                        );
+                        return changed
+                            ? { ...previous, ...colorMap }
+                            : previous;
+                    });
 
-                        // First pass: collect all interaction counts to find max
-                        for (const widgetId of widgetIds) {
-                            const interactionCount = sp.detailedData?.get(widgetId)?.length ?? 0;
-                            interactionCounts.push(interactionCount);
-                        }
+                    const boxes = buildSuperAggregateBoxes({
+                        superProvenance: sp,
+                        getColor: index => colorScale(index),
+                    });
 
-                        const maxInteractions = Math.max(...interactionCounts, 1); // At least 1 to avoid division by zero
-                        const defaultWidth = 20; // Default fixed width for non-interacted widgets
-                        const containerMaxWidth = 400; // Maximum width for the AggregateView container
-
-                        // Create a map to assign consistent colors to each widgetId
-                        const widgetIdToIndex = new Map();
-                        widgetIds.forEach((id, idx) => widgetIdToIndex.set(id, idx));
-
-                        // Calculate total fixed width required for non-interacted widgets
-                        const nonInteractedCount = interactionCounts.filter(count => count === 0).length;
-                        const totalFixedWidth = nonInteractedCount * defaultWidth;
-
-                        // Calculate remaining width available for interacted widgets
-                        const interactedCount = interactionCounts.length - nonInteractedCount;
-                        const availableWidthForInteracted = Math.max(0, containerMaxWidth - totalFixedWidth);
-
-                        // Calculate total interactions among interacted widgets for proportional sizing
-                        const totalInteractions = interactionCounts.reduce((sum, count) => sum + count, 0);
-
-                        // Second pass: create boxes with calculated widths
-                        const colorMap = {}; // Track colors for each widgetId
-                        for (let i = 0; i < widgetIds.length; i++) {
-                            const widgetId = widgetIds[i];
-                            // Get color from D3 scale using consistent index based on widgetId
-                            const colorIndex = widgetIdToIndex.get(widgetId);
-                            const baseColor = colorScale(colorIndex);
-                            // Store color for this widgetId
-                            colorMap[widgetId] = baseColor;
-                            // Get interaction count from detailedData array length
-                            const interactionCount = interactionCounts[i];
-
-                            // Calculate width logic:
-                            // 1. If NO interaction (count = 0): use default fixed width (20px)
-                            // 2. If HAS interaction (count > 0): share remaining space proportionally
-                            //    If it's the only interacted widget, it takes all available space.
-                            //    If multiple widgets are interacted, they split space based on interaction count.
-                            let calculatedWidth;
-                            if (interactionCount === 0) {
-                                calculatedWidth = defaultWidth;
-                            } else {
-                                if (totalInteractions > 0) {
-                                    // Proportional share of available width
-                                    const ratio = interactionCount / totalInteractions;
-                                    calculatedWidth = ratio * availableWidthForInteracted;
-                                } else {
-                                    // Should not happen if interactionCount > 0, but safe fallback
-                                    calculatedWidth = availableWidthForInteracted / interactedCount;
-                                }
-                            }
-
-                            // Get the most recent interaction time
-                            const interactions = sp.detailedData?.get(widgetId) ?? [];
-                            let lastInteractionTime = null;
-                            if (interactions.length > 0) {
-                                // Find the entry with the highest index (most recent)
-                                const mostRecent = interactions.reduce((latest, current) => {
-                                    return (current.index > latest.index) ? current : latest;
-                                }, interactions[0]);
-                                lastInteractionTime = mostRecent.time;
-                            }
-
-                            boxes.push({ color: baseColor, widgetId, interactionCount, width: calculatedWidth, lastInteractionTime });
-                        }
-
-                        // No need for separate scaling pass as we calculated based on containerMaxWidth directly
-
-                        // Update widgetColors state with the color mapping
-                        setWidgetColors(prev => ({ ...prev, ...colorMap }));
-
-                        // Sort boxes by last interaction time (oldest first, most recent last)
-                        // Widgets with no interactions go to the left (beginning)
-                        boxes.sort((a, b) => {
-                            if (!a.lastInteractionTime && !b.lastInteractionTime) return 0;
-                            if (!a.lastInteractionTime) return -1; // a goes to left
-                            if (!b.lastInteractionTime) return 1; // b goes to left
-                            // Both have interaction times, sort by oldest first (most recent goes rightmost)
-                            return a.lastInteractionTime.getTime() - b.lastInteractionTime.getTime();
-                        });
-
-                        // Always update to reflect interaction count changes
-                        setColoredBoxes(boxes);
-                        if (widgetSize !== lastWidgetCountRef.current) {
-                            lastWidgetCountRef.current = widgetSize;
-                        }
-                        return true; // Widgets found
-                    }
+                    setColoredBoxes(boxes);
+                    lastWidgetCountRef.current = boxes.length;
+                    return boxes.length > 0;
                 }
             }
             if (lastWidgetCountRef.current !== 0) {
@@ -147,7 +78,7 @@ const AggregateView = ({ target }) => {
         };
 
         // Update immediately
-        const hasWidgets = updateColoredBoxes();
+        updateColoredBoxes();
 
         // Set up interval to check for widget registration and interaction changes
         // Keep polling to update interaction counts even after widgets are found
@@ -177,13 +108,20 @@ const AggregateView = ({ target }) => {
             highlightedElementRef.current = null;
         }
 
-        // Try multiple strategies to find the element
-        let element = null;
+        // V2 widgets expose their element explicitly. The DOM lookup below is
+        // retained only for controls that have not yet been migrated.
+        const registration = registrations.get(widgetId);
+        let element = getRegistrationElement(registration);
+        if (registration) {
+            focusWidget(widgetId);
+        }
         
         // Prefer container first to allow highlighting entire widget blocks
         const containerClass = `.${widgetId}`;
-        const container = document.querySelector(containerClass);
-        if (container) {
+        const container = element
+            ? null
+            : document.querySelector(containerClass);
+        if (!element && container) {
             if (
                 widgetId.includes('checkbox') || container.classList.contains('checkbox-group') ||
                 widgetId.includes('radiobutton') || container.classList.contains('radiobutton-group') ||
@@ -273,8 +211,6 @@ const AggregateView = ({ target }) => {
         }
     };
 
-    const hasAnyInteraction = coloredBoxes.some(box => box.interactionCount > 0);
-
     return (
         <div style={{ 
             display: "flex", 
@@ -282,7 +218,9 @@ const AggregateView = ({ target }) => {
             marginTop: "1rem", 
             width: "400px",
             height: "45px",
-            backgroundColor: hasAnyInteraction ? 'transparent' : '#eeeeee'
+            backgroundColor: coloredBoxes.length > 0
+                ? 'transparent'
+                : '#eeeeee'
         }}>
             {coloredBoxes.map((box, index) => (
                 <div key={index}>
@@ -293,11 +231,15 @@ const AggregateView = ({ target }) => {
                         style={{
                             width: box.width,   // TODO: Ensure default is 15px
                             height: 45,
-                            backgroundColor: box.interactionCount > 0 ? box.color : 'white',
+                            backgroundColor: box.interactionCount > 0
+                                ? box.color
+                                : 'white',
                             cursor: 'pointer',
                             opacity: box.interactionCount > 0 ? 0.6 : 1,
                             transition: 'width 0.3s ease',
-                            border: box.interactionCount > 0 ? '1px solid rgba(0, 0, 0, 0.3)' : `2px solid ${box.color}`,
+                            border: box.interactionCount > 0
+                                ? '1px solid rgba(0, 0, 0, 0.3)'
+                                : `2px solid ${box.color}`,
                             boxSizing: 'border-box' // Ensure border is included in width/height
                         }}
                     />

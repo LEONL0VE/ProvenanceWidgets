@@ -4,6 +4,8 @@ import Guidance, { Key } from "../../Guidance";
 export interface TemporalRecord {
   time: Date;
   index: number;
+  kind?: "baseline" | "interaction" | "sample";
+  source?: "initial" | "user" | "history" | "external" | "time";
 }
 
 export interface TemporalValueRecord<V> extends TemporalRecord {

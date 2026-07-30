@@ -19,11 +19,25 @@ export default class GenericProvenance<T extends Key> extends Provenance<
     temporalData.forEach(({ value, time }) => this.insert(value, { time }));
   }
 
-  insert(value: T, options: { caller?: Key; time?: Date } = {}) {
+  insert(
+    value: T,
+    options: {
+      caller?: Key;
+      time?: Date;
+      kind?: TemporalRecord["kind"];
+      source?: TemporalRecord["source"];
+    } = {}
+  ) {
     const time = this.updateTime(options.time);
     const index = this.domain.get("index")![1] + 1;
 
-    this.detailedData.set(index, { value, time, index });
+    this.detailedData.set(index, {
+      value,
+      time,
+      index,
+      ...(options.kind ? { kind: options.kind } : {}),
+      ...(options.source ? { source: options.source } : {}),
+    });
 
     const count = (this.aggregateData.get(value)?.count ?? 0) + 1;
     this.aggregateData.set(value, { time, count, index });
@@ -32,10 +46,10 @@ export default class GenericProvenance<T extends Key> extends Provenance<
     this.domain.set("count", [0, Math.max(maxCount, count)]);
     this.domain.set("index", [0, index]);
 
-    const { caller } = options;
+    const { caller, kind, source } = options;
     this.dispatchEvent(
       new CustomEvent(UNILATERAL_GUIDANCE_EVENT_NAME, {
-        detail: { ...this, caller },
+        detail: { ...this, caller, kind, source },
       })
     );
     return this;

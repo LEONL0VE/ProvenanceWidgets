@@ -2,6 +2,22 @@ export * from "./utils";
 export * from "./Guidance";
 export * from "./strategies";
 export * from "./constants";
+export * from "./controllers/index.js";
+
+export type {
+  CommonProvenanceWidgetProps,
+  LegacyProvenanceRecord,
+  LegacySerializedProvenance,
+  ProvenanceChangeMeta,
+  ProvenanceChangeSource,
+  ProvenanceMode,
+  ProvenanceRecordKind,
+  ProvenanceView,
+  ProvenanceWidgetType,
+  SerializedProvenance,
+  SerializedProvenanceRecord,
+  WidgetRegistration,
+} from "./types/provenance";
 
 export { default as Guidance } from "./Guidance";
 
@@ -28,3 +44,5 @@ export { default as SuperProvenanceWidget } from "./components/SuperProvenance.j
 export { default as ProvenanceProvider } from "./components/providers/ProvenanceProvider.js";
 export { default as useProvenance } from "./components/hooks/useProvenance.js";
 export { default as useRevertedValue } from "./components/hooks/useRevertedValue.js";
+export { default as useProvenanceController } from "./components/hooks/useProvenanceController.js";
+export { default as useWidgetRegistry } from "./components/hooks/useWidgetRegistry.js";

@@ -4,16 +4,22 @@ import { Tooltip } from 'react-tooltip';
 import Chart from "./Chart.js"
 import useProvenance from './hooks/useProvenance.js';
 import useWidgetColors from './hooks/useWidgetColors.js';
+import useWidgetRegistry from './hooks/useWidgetRegistry.js';
 import Internal_Chart from './Internal_Chart.js';
 import { scaleOrdinal } from 'd3-scale';
 import { schemeCategory10 } from 'd3-scale-chromatic';
 import ProvenanceContext from './contexts/provenance.js';
+import {
+    buildSuperInteractionSequence,
+    getSuperWidgetIds,
+    restoreRegisteredWidgetsAtTime,
+} from './superProvenanceData.js';
 
 const Internal_ProvenanceButton = ({ prov }) => {
     const [open, setOpen] = useState()
     const [registeredComponents, setRegisteredComponents] = useProvenance()
     const [widgetColors] = useWidgetColors()
-    const [, setRevertedValues] = useState({}); // Local state for something else? No, use context
+    const { registrations } = useWidgetRegistry();
     const context = useContext(ProvenanceContext);
     const setRevertedValuesContext = context.actions.setRevertedValues;
     const [dropdownWidth, setDropdownWidth] = useState(0)
@@ -28,7 +34,18 @@ const Internal_ProvenanceButton = ({ prov }) => {
         const newRevertedValues = {};
 
         const widgetIds = Array.from(prov.registeredWidgets.keys());
+        restoreRegisteredWidgetsAtTime({
+            registrations,
+            widgetIds,
+            targetTime,
+            source: "history",
+        });
+
+        // Temporary compatibility path for widgets that have not yet moved
+        // to explicit metadata registration. Migrated widgets, including the
+        // single slider, are restored above through their own setValue.
         for (const widgetId of widgetIds) {
+            if (registrations.has(widgetId)) continue;
             const widgetProvenance = registeredComponents.get(widgetId);
             if (!widgetProvenance || !widgetProvenance.detailedData) continue;
 
@@ -116,141 +133,21 @@ const Internal_ProvenanceButton = ({ prov }) => {
     // Use D3 chromatic scale for color allocation (same as AggregateView)
     const colorScale = useMemo(() => scaleOrdinal(schemeCategory10), []);
 
-    // Build sequence of all interactions from all provenances
+    // Build a sequence of real interactions only. Initial baselines remain in
+    // each widget strategy for replay, but are not SuperProvenance events.
     const interactionSequence = useMemo(() => {
-        if (!prov || !prov.registeredWidgets || !registeredComponents) return [];
-
-        const allInteractions = [];
-        const widgetIds = Array.from(prov.registeredWidgets.keys());
-
-        // Create color mapping (same as AggregateView)
-        const widgetIdToIndex = new Map();
-        widgetIds.forEach((id, idx) => widgetIdToIndex.set(id, idx));
-
-        // Collect all interactions from all widgets
-        for (const widgetId of widgetIds) {
-            const widgetProvenance = registeredComponents.get(widgetId);
-            if (!widgetProvenance || !widgetProvenance.detailedData) continue;
-
-            // Get color for this widget
-            const colorIndex = widgetIdToIndex.get(widgetId);
-            const color = widgetColors[widgetId] || colorScale(colorIndex);
-
-            // Extract interactions from detailedData
-            // For different provenance types, detailedData structure varies:
-            // - For NumericProvenance/TextProvenance (GenericProvenance): Map<index, {value, time, index}>
-            // - For SelectionProvenance: Map<checkboxLabel, Array<TemporalSelectionRecord>>
-            // - For SuperProvenance: Map<widgetId, Array<TemporalRecord>>
-            const detailedDataEntries = widgetProvenance.detailedData instanceof Map
-                ? Array.from(widgetProvenance.detailedData.entries())
-                : [];
-
-            // Check if this is GenericProvenance (NumericProvenance/TextProvenance)
-            // GenericProvenance uses index as key and {value, time, index} as value
-            const isGenericProvenance = detailedDataEntries.length > 0 &&
-                typeof detailedDataEntries[0][0] === 'number' &&
-                detailedDataEntries[0][1] &&
-                typeof detailedDataEntries[0][1] === 'object' &&
-                !Array.isArray(detailedDataEntries[0][1]) &&
-                'value' in detailedDataEntries[0][1];
-
-            // Check if this is SelectionProvenance
-            const isSelectionProvenance = detailedDataEntries.length > 0 &&
-                typeof detailedDataEntries[0][0] === 'string' &&
-                Array.isArray(detailedDataEntries[0][1]) &&
-                detailedDataEntries[0][1].length > 0 &&
-                detailedDataEntries[0][1][0]?.select;
-
-            // Flatten all interactions for this widget
-            if (isGenericProvenance) {
-                // For GenericProvenance (TextProvenance, NumericProvenance)
-                // detailedData is Map<index, {value, time, index}>
-                for (const [indexKey, record] of detailedDataEntries) {
-                    if (record && typeof record === 'object' && 'time' in record) {
-                        allInteractions.push({
-                            widgetId,
-                            color,
-                            time: record.time instanceof Date ? record.time : (record.time ? new Date(record.time) : null),
-                            index: record.index ?? indexKey,
-                            value: record.value
-                        });
-                    }
-                }
-            } else if (isSelectionProvenance) {
-                // For SelectionProvenance
-                // detailedData is Map<checkboxLabel, Array<TemporalSelectionRecord>>
-                for (const [key, records] of detailedDataEntries) {
-                    if (Array.isArray(records)) {
-                        for (const record of records) {
-                            if (record) {
-                                // Handle select/unselect records
-                                if (record.select) {
-                                    allInteractions.push({
-                                        widgetId,
-                                        color,
-                                        time: record.select.time instanceof Date ? record.select.time : (record.select.time ? new Date(record.select.time) : null),
-                                        index: record.select.index,
-                                        value: key
-                                    });
-                                }
-                                // Optionally include unselect records
-//                                 if (record.unselect) {
-//                                     allInteractions.push({
-//                                         widgetId,
-//                                         color,
-//                                         time: record.unselect.time instanceof Date ? record.unselect.time : (record.unselect.time ? new Date(record.unselect.time) : null),
-//                                         index: record.unselect.index,
-//                                         value: key
-//                                     });
-//                                 }
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Fallback for other types (shouldn't happen, but handle gracefully)
-                for (const [key, records] of detailedDataEntries) {
-                    if (Array.isArray(records)) {
-                        for (const record of records) {
-                            if (record && (record.time || record.index !== undefined)) {
-                                allInteractions.push({
-                                    widgetId,
-                                    color,
-                                    time: record.time instanceof Date ? record.time : (record.time ? new Date(record.time) : null),
-                                    index: record.index,
-                                    value: key
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Sort by time first, then by index
-        allInteractions.sort((a, b) => {
-            if (a.time && b.time) {
-                const timeDiff = a.time.getTime() - b.time.getTime();
-                if (timeDiff !== 0) return timeDiff;
-            }
-            // Fallback to index if times are equal or missing
-            return (a.index || 0) - (b.index || 0);
+        return buildSuperInteractionSequence({
+            superProvenance: prov,
+            registeredComponents,
+            widgetColors,
+            getColor: index => colorScale(index),
         });
-
-        // Calculate width for each box: divide container width equally among all interactions
-        // If only one interaction, it takes full width (100%)
-        // If multiple interactions, each gets equal share
-        const interactionCount = allInteractions.length;
-        if (interactionCount > 0) {
-            // Each box gets equal width (100% / count)
-            const boxWidthPercent = 100 / interactionCount;
-            allInteractions.forEach(interaction => {
-                interaction.width = `${boxWidthPercent}%`;
-            });
-        }
-
-        return allInteractions;
     }, [prov, registeredComponents, widgetColors, colorScale]);
+
+    const temporalWidgetIds = useMemo(
+        () => getSuperWidgetIds(prov),
+        [prov, registeredComponents]
+    );
 
     const handleClickOutside = (event) => {
         if (buttonRef.current && !buttonRef.current.contains(event.target) &&
@@ -337,7 +234,17 @@ const Internal_ProvenanceButton = ({ prov }) => {
     return (
         <>
             <div style={{ display: "flex", alignItems: "center", gap: "5px", marginTop: "1rem" }}>
-                <Button ref={buttonRef} onClick={() => setOpen(prev => !prev)} style={{ width: "40px", height: "40px" }} text icon={(options) => open ? <img width={30} height={30} src={TEMPORAL_B64} /> : <img width={30} height={30} src={AGGREGATE_B64} />} />
+                <Button
+                    ref={buttonRef}
+                    aria-label="Toggle SuperProvenance temporal view"
+                    onClick={() => setOpen(previous => !previous)}
+                    style={{ width: "40px", height: "40px" }}
+                    text
+                    icon={() => open
+                        ? <img width={30} height={30} src={TEMPORAL_B64} />
+                        : <img width={30} height={30} src={AGGREGATE_B64} />
+                    }
+                />
                 {/* <Tooltip
                 id={"open-tooltip-"}
                 events={['click']}
@@ -404,10 +311,10 @@ const Internal_ProvenanceButton = ({ prov }) => {
                     )}
 
                     {/* Rows for each registered component */}
-                    {prov && prov.registeredWidgets && Array.from(prov.registeredWidgets.keys()).map((target, index) => (
+                    {temporalWidgetIds.map((target, index) => (
                         <div key={target} style={{
                             position: 'relative',
-                            borderBottom: index < prov.registeredWidgets.size - 1 ? '1px solid #eee' : 'none',
+                            borderBottom: index < temporalWidgetIds.length - 1 ? '1px solid #eee' : 'none',
                             minHeight: '32px' // Ensure minimum height
                         }}>
                             <div style={{ padding: '0.5rem', position: 'relative', zIndex: 1 }}>
@@ -483,4 +390,4 @@ const Internal_ProvenanceButton = ({ prov }) => {
     )
 }
 
-export default Internal_ProvenanceButton 
+export default Internal_ProvenanceButton;

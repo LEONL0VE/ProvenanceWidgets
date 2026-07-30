@@ -1,5 +1,18 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useId,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import { createPortal } from 'react-dom';
+import {
+    getRegistrationElement,
+    normalizeWidgetRegistration,
+    registerWidgetInMap,
+    unregisterWidgetFromMap,
+} from '../../controllers/widgetRegistry.js';
 import ProvenanceContext from '../contexts/provenance.js';
 
 const ProvenanceProvider = ({ children }) => {
@@ -9,9 +22,105 @@ const ProvenanceProvider = ({ children }) => {
         [reactId]
     );
     const [registeredComponents, setRegisteredComponents] = useState(new Map())
+    const [widgetRegistrations, setWidgetRegistrations] = useState(new Map())
+    const widgetRegistrationsRef = useRef(widgetRegistrations);
     const [widgetColors, setWidgetColors] = useState({}) // Object mapping target -> hex color
     const [revertedValues, setRevertedValues] = useState({}) // Object mapping id -> value at specific time
     const [activeTooltip, setActiveTooltip] = useState(null);
+
+    const unregisterWidget = useCallback((id, expectedRegistration) => {
+        const currentRegistrations = widgetRegistrationsRef.current;
+        const registration =
+            expectedRegistration ?? currentRegistrations.get(id);
+        const nextRegistrations = unregisterWidgetFromMap(
+            currentRegistrations,
+            id,
+            expectedRegistration
+        );
+        if (nextRegistrations === currentRegistrations) return false;
+
+        widgetRegistrationsRef.current = nextRegistrations;
+        setWidgetRegistrations(nextRegistrations);
+        setRegisteredComponents(previous => {
+            if (
+                !(previous instanceof Map) ||
+                previous.get(id) !== registration?.provenance
+            ) {
+                return previous;
+            }
+            const next = new Map(previous);
+            next.delete(id);
+            return next;
+        });
+        return true;
+    }, []);
+
+    const registerWidget = useCallback(registration => {
+        const normalized = normalizeWidgetRegistration(registration);
+        const nextRegistrations = registerWidgetInMap(
+            widgetRegistrationsRef.current,
+            normalized
+        );
+        widgetRegistrationsRef.current = nextRegistrations;
+        setWidgetRegistrations(nextRegistrations);
+
+        // Keep the original strategy Map alive during the incremental V2
+        // migration. Existing Chart/Aggregate components still consume it.
+        setRegisteredComponents(previous => {
+            const next = previous instanceof Map
+                ? new Map(previous)
+                : new Map();
+            next.set(normalized.id, normalized.provenance);
+            return next;
+        });
+
+        return () => unregisterWidget(normalized.id, normalized);
+    }, [unregisterWidget]);
+
+    const notifyWidget = useCallback(id => {
+        const registration = widgetRegistrationsRef.current.get(id);
+        if (!registration) return false;
+
+        const nextRegistrations = new Map(widgetRegistrationsRef.current);
+        widgetRegistrationsRef.current = nextRegistrations;
+        setWidgetRegistrations(nextRegistrations);
+        setRegisteredComponents(previous => {
+            const next = previous instanceof Map
+                ? new Map(previous)
+                : new Map();
+            next.set(id, registration.provenance);
+            return next;
+        });
+        return true;
+    }, []);
+
+    const getWidgetRegistration = useCallback(
+        id => widgetRegistrationsRef.current.get(id),
+        []
+    );
+
+    const restoreWidgetValue = useCallback(
+        (id, value, source = "history") => {
+            const registration = widgetRegistrationsRef.current.get(id);
+            if (!registration) return false;
+            return registration.setValue(value, source) !== false;
+        },
+        []
+    );
+
+    const focusWidget = useCallback(id => {
+        const registration = widgetRegistrationsRef.current.get(id);
+        if (!registration) return false;
+        if (typeof registration.focus === "function") {
+            registration.focus();
+            return true;
+        }
+        const element = getRegistrationElement(registration);
+        if (!element) return false;
+        element.focus?.();
+        element.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        return true;
+    }, []);
 
     const getPosition = useCallback((event) => {
         const source = event?.nativeEvent ?? event;
@@ -79,9 +188,37 @@ const ProvenanceProvider = ({ children }) => {
     const value = useMemo(() => ({
         tooltipId,
         tooltip,
-        state: { registeredComponents, widgetColors, revertedValues },
-        actions: { setRegisteredComponents, setWidgetColors, setRevertedValues },
-    }), [tooltipId, tooltip, registeredComponents, widgetColors, revertedValues])
+        state: {
+            registeredComponents,
+            widgetRegistrations,
+            widgetColors,
+            revertedValues,
+        },
+        actions: {
+            setRegisteredComponents,
+            registerWidget,
+            unregisterWidget,
+            notifyWidget,
+            getWidgetRegistration,
+            restoreWidgetValue,
+            focusWidget,
+            setWidgetColors,
+            setRevertedValues,
+        },
+    }), [
+        tooltipId,
+        tooltip,
+        registeredComponents,
+        widgetRegistrations,
+        widgetColors,
+        revertedValues,
+        registerWidget,
+        unregisterWidget,
+        notifyWidget,
+        getWidgetRegistration,
+        restoreWidgetValue,
+        focusWidget,
+    ])
 
     return (
         <ProvenanceContext.Provider value={value}>

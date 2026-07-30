@@ -1,0 +1,72 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+    getProvenanceButtonState,
+    hasUserProvenance,
+    isInsideProvenanceInteraction,
+} from "../src/components/provenanceButtonState.js";
+
+const provenance = ({
+    interacted,
+    kind = "baseline",
+} = {}) => ({
+    hasUserInteracted: interacted,
+    detailedData: new Map([
+        [1, { value: 10, kind }],
+    ]),
+});
+
+test("keeps the footprint disabled for a baseline-only slider", () => {
+    assert.equal(hasUserProvenance(provenance({
+        interacted: false,
+    })), false);
+    assert.equal(getProvenanceButtonState({
+        provenance: provenance({ interacted: false }),
+    }), "disabled");
+});
+
+test("switches the footprint between Aggregate and Temporal states", () => {
+    const interacted = provenance({ interacted: true });
+    assert.equal(getProvenanceButtonState({
+        provenance: interacted,
+        open: false,
+    }), "aggregate");
+    assert.equal(getProvenanceButtonState({
+        provenance: interacted,
+        open: true,
+    }), "temporal");
+});
+
+test("visualize=false hides the separately rendered footprint", () => {
+    assert.equal(getProvenanceButtonState({
+        provenance: provenance({ interacted: true }),
+        visualize: false,
+        open: true,
+    }), "hidden");
+});
+
+test("clicking a Temporal point is inside the footprint interaction boundary", () => {
+    const chart = {
+        getAttribute: name =>
+            name === "data-provenance-chart-target"
+                ? "single-slider"
+                : null,
+    };
+    const point = {
+        closest: selector =>
+            selector === "[data-provenance-chart-target]"
+                ? chart
+                : null,
+    };
+
+    assert.equal(isInsideProvenanceInteraction({
+        eventTarget: point,
+        buttonElement: { contains: () => false },
+        target: "single-slider",
+    }), true);
+    assert.equal(isInsideProvenanceInteraction({
+        eventTarget: point,
+        buttonElement: { contains: () => false },
+        target: "another-widget",
+    }), false);
+});

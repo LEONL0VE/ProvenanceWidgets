@@ -1,32 +1,26 @@
-import { Slider as Slider_ } from 'primereact/slider/slider.esm.js';
-import { useEffect, useRef, useState } from 'react';
-import SuperProvenance_ from '../strategies/provenance/SuperProvenance.ts';
+import { useEffect, useState } from 'react';
+import SuperProvenance_, {
+    WidgetType,
+} from '../strategies/provenance/SuperProvenance.ts';
 import { UNILATERAL_GUIDANCE_EVENT_NAME } from '../constants.ts';
 import useProvenance from './hooks/useProvenance.js';
-import { transform } from './utils.js';
+import useWidgetRegistry from './hooks/useWidgetRegistry.js';
 import Internal_ProvenanceButton from './Internal_ProvenanceButton.js';
 import AggregateView from './AggregateView.js';
 
 const SuperProvenance = (props) => {
-    const [value, setValue] = useState()
     const [registeredComponents, setRegisteredComponents] = useProvenance()
-    const [superProvenance, setSuperProvenance] = useState(null)
-    const [curr, setCurr] = useState()
-    const lastInsertedRef = useRef(null)
-    const registeredWidgetsRef = useRef(new Set())
+    const { registrations } = useWidgetRegistry();
+    const [superProvenance] = useState(() => new SuperProvenance_())
 
     useEffect(() => {
-        const superProv = new SuperProvenance_()
-
-        setSuperProvenance(superProv)
         setRegisteredComponents(prev => {
             const newMap = prev instanceof Map ? new Map(prev) : new Map()
-            newMap.set(props.id, superProv)
+            newMap.set(props.id, superProvenance)
             return newMap
         })
 
-        superProv.addEventListener(UNILATERAL_GUIDANCE_EVENT_NAME, v => {
-            console.log(v.detail)
+        const handleSuperChange = () => {
             // Bump reference so consumers re-render and can read updated provenance
             setRegisteredComponents(prev => {
                 if (prev instanceof Map) {
@@ -35,31 +29,94 @@ const SuperProvenance = (props) => {
                 // Fallback: create new Map if prev is not a Map
                 return new Map()
             })
-        })
-    }, [])
+        };
+        superProvenance.addEventListener(
+            UNILATERAL_GUIDANCE_EVENT_NAME,
+            handleSuperChange
+        )
+
+        return () => {
+            superProvenance.removeEventListener(
+                UNILATERAL_GUIDANCE_EVENT_NAME,
+                handleSuperChange
+            );
+            Array.from(superProvenance.registeredWidgets.keys()).forEach(
+                widgetId => superProvenance.unregister(widgetId)
+            );
+            setRegisteredComponents(prev => {
+                if (
+                    !(prev instanceof Map) ||
+                    prev.get(props.id) !== superProvenance
+                ) {
+                    return prev;
+                }
+                const next = new Map(prev);
+                next.delete(props.id);
+                return next;
+            });
+        };
+    }, [
+        props.id,
+        superProvenance,
+        setRegisteredComponents,
+    ])
 
     useEffect(() => {
-        if (registeredComponents.size != 0 && superProvenance) {
-            let registeredNew = false;
-            props.components.forEach(c => {
-                // Only register if component exists and hasn't been registered yet
-                if (registeredComponents.has(c) && !registeredWidgetsRef.current.has(c)) {
-                    superProvenance.register(c, registeredComponents.get(c))
-                    registeredWidgetsRef.current.add(c);
-                    registeredNew = true;
-                }
-            })
-            // Only trigger re-render when NEW widgets are registered
-            if (registeredNew) {
-                setRegisteredComponents(prev => {
-                    if (prev instanceof Map) {
-                        return new Map(prev)
-                    }
-                    return new Map()
-                })
+        const componentIds = new Set(props.components ?? []);
+        let changed = false;
+
+        for (const widgetId of superProvenance.registeredWidgets.keys()) {
+            const metadata = registrations.get(widgetId);
+            const strategy =
+                metadata?.provenance ??
+                registeredComponents.get(widgetId);
+            if (!componentIds.has(widgetId) || !strategy) {
+                changed = superProvenance.unregister(widgetId) || changed;
             }
         }
-    }, [registeredComponents, superProvenance])
+
+        componentIds.forEach(widgetId => {
+            const metadata = registrations.get(widgetId);
+            const strategy =
+                metadata?.provenance ??
+                registeredComponents.get(widgetId);
+            if (!strategy) return;
+
+            const existing =
+                superProvenance.registeredWidgets.get(widgetId);
+            const needsRegistration =
+                existing?.provenance !== strategy ||
+                existing?.type !== (metadata?.type ?? WidgetType.UNKNOWN) ||
+                existing?.setValue !== metadata?.setValue;
+            if (!needsRegistration) return;
+
+            if (metadata) {
+                superProvenance.register(metadata);
+            } else {
+                // Compatibility for the six widgets not yet migrated. No
+                // behavior is inferred from their id.
+                superProvenance.register(
+                    widgetId,
+                    strategy,
+                    undefined,
+                    WidgetType.UNKNOWN
+                );
+            }
+            changed = true;
+        });
+
+        if (changed) {
+            setRegisteredComponents(prev =>
+                prev instanceof Map ? new Map(prev) : new Map()
+            );
+        }
+    }, [
+        props.components,
+        registeredComponents,
+        registrations,
+        superProvenance,
+        setRegisteredComponents,
+    ])
 
     return (
         <div>
@@ -72,4 +129,4 @@ const SuperProvenance = (props) => {
     )
 }
 
-export default SuperProvenance 
+export default SuperProvenance

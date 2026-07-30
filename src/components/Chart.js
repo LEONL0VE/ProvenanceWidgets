@@ -1,16 +1,201 @@
-import { useEffect, useRef, useMemo } from "react";
+import {
+    useCallback,
+    useEffect,
+    useRef,
+    useMemo,
+    useState,
+} from "react";
 import * as d3 from "d3";
 import useProvenance from './hooks/useProvenance.js';
 import useProvenanceTooltip from './hooks/useProvenanceTooltip.js';
+import useWidgetRegistry from './hooks/useWidgetRegistry.js';
 import { interpolateOranges } from 'd3'; // Import color scale
 import { formatTemporalTooltip, getTooltipAnchorProps } from './provenanceTooltip.js';
+import {
+    brushSelectionToPositionRange,
+    filterTemporalEntries,
+    getTemporalYPositions,
+    normalizeTemporalBrush,
+    restoreTemporalPoint,
+} from './singleSliderTemporal.js';
 
-const Chart = ({ target, part = "full", theme = "dark" }) => {
+const TEMPORAL_BRUSH_HEIGHT = 240;
+
+const TemporalBrush = ({
+    mode,
+    onRangeChange,
+    positions,
+    target,
+    tooltipId,
+}) => {
+    const brushRef = useRef(null);
+    const entryCount = positions.length;
+
+    useEffect(() => {
+        if (!brushRef.current || entryCount <= 1) return undefined;
+
+        const brush = d3
+            .brushY()
+            // PW 1.0 attaches brushY to the y-axis and extends its hit area
+            // to the left, instead of reserving a separate blank gutter.
+            .extent([[-42, 0], [0, TEMPORAL_BRUSH_HEIGHT]])
+            .on("end", event => {
+                const range = brushSelectionToPositionRange(
+                    event.selection,
+                    positions
+                );
+                onRangeChange(range);
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent(
+                        "provenance-widgets",
+                        {
+                            detail: {
+                                id: target,
+                                widget: "slider",
+                                mode,
+                                interaction: "brush-end",
+                                data: {
+                                    selection: event.selection,
+                                    range,
+                                },
+                            },
+                        }
+                    ));
+                }
+            });
+
+        const brushGroup = d3.select(brushRef.current).call(brush);
+        brushGroup
+            .selectAll(".overlay")
+            .attr("fill", "rgba(113, 231, 251, 0.06)")
+            .style("cursor", "ns-resize");
+        brushGroup
+            .selectAll(".selection")
+            .attr("fill", "#71e7fb")
+            .attr("fill-opacity", 0.24)
+            .attr("stroke", "#17a2b8")
+            .attr("stroke-width", 1.5);
+        brushGroup
+            .selectAll(".handle")
+            .attr("fill", "#17a2b8")
+            .attr("fill-opacity", 0.8);
+        return () => {
+            d3.select(brushRef.current).on(".brush", null);
+        };
+    }, [entryCount, mode, onRangeChange, positions, target]);
+
+    if (entryCount <= 1) return null;
+    const tickStride = Math.max(1, Math.ceil(entryCount / 8));
+    const ticks = positions
+        .map((position, index) => ({ position, index }))
+        .filter(({ index }) => (
+            mode === "time"
+                ? index === 0 || index === entryCount - 1
+                : (
+                    index % tickStride === 0 ||
+                    index === entryCount - 1
+                )
+        ));
+    const tooltipProps = getTooltipAnchorProps(
+        tooltipId,
+        "Drag vertically to zoom the history range. " +
+        "Click outside the selection to show all history."
+    );
+
+    return (
+        <div
+            {...tooltipProps}
+            style={{
+                ...tooltipProps.style,
+                flex: "0 0 64px",
+                width: "64px",
+            }}
+        >
+            <svg
+                aria-label={
+                    "Drag vertically to zoom Single Slider history"
+                }
+                data-provenance-temporal-brush={target}
+                width="64"
+                height={TEMPORAL_BRUSH_HEIGHT}
+                style={{ display: "block", overflow: "visible" }}
+            >
+                <title>
+                    Drag vertically to zoom; clear the selection to reset
+                </title>
+                <text
+                    x="10"
+                    y={TEMPORAL_BRUSH_HEIGHT / 2}
+                    fill="#6c757d"
+                    fontSize="11"
+                    textAnchor="middle"
+                    transform={
+                        `rotate(-90 10 ${TEMPORAL_BRUSH_HEIGHT / 2})`
+                    }
+                >
+                    {mode === "time"
+                        ? "time · drag to zoom"
+                        : "interaction · drag to zoom"}
+                </text>
+                <line
+                    x1="58"
+                    x2="58"
+                    y1="0"
+                    y2={TEMPORAL_BRUSH_HEIGHT}
+                    stroke="#6c757d"
+                />
+                {ticks.map(({ position, index }) => (
+                    <g key={index}>
+                        <line
+                            x1="52"
+                            x2="58"
+                            y1={position}
+                            y2={position}
+                            stroke="#6c757d"
+                        />
+                        <text
+                            x="49"
+                            y={position}
+                            dy="0.32em"
+                            fill="#6c757d"
+                            fontSize="10"
+                            textAnchor="end"
+                        >
+                            {mode === "time"
+                                ? index === 0 ? "t=0" : "now"
+                                : index}
+                        </text>
+                    </g>
+                ))}
+                <g ref={brushRef} transform="translate(58,0)" />
+            </svg>
+        </div>
+    );
+};
+
+const Chart = ({
+    target,
+    part = "full",
+    theme = "dark",
+    provenance,
+    mode = "interaction",
+    temporalBrush = false,
+}) => {
     // part: "full" | "header" | "body"
     // theme: "dark" | "light"
     const chartRef = useRef(null);
     const [registeredComponents] = useProvenance();
+    const { restoreWidgetValue } = useWidgetRegistry();
     const tooltipId = useProvenanceTooltip();
+    const [brushRange, setBrushRange] = useState(null);
+    const handleBrushRangeChange = useCallback(
+        range => setBrushRange(range),
+        []
+    );
+
+    useEffect(() => {
+        setBrushRange(null);
+    }, [target, temporalBrush]);
     
     const chartData = useMemo(() => {
         if (!target) return null;
@@ -244,19 +429,52 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
         if (isNumericProvenance) {
             // Single slider: y-axis is sequence of interactions, x-axis is slider value domain.
             // Render one point per interaction (no range).
-            const sorted = detailedDataEntries.sort((a, b) => a[0] - b[0]);
+            const publicRecords =
+                provenance?.widgetType === "single-slider" &&
+                Array.isArray(provenance.data)
+                    ? provenance.data.map((record, index) => [
+                        index + 1,
+                        {
+                            value: record.value,
+                            time: new Date(record.timestamp),
+                            index: index + 1,
+                            kind: record.kind,
+                            source: record.source,
+                        },
+                    ])
+                    : [];
+            const sorted = (
+                publicRecords.length > 0
+                    ? publicRecords
+                    : detailedDataEntries
+            ).sort((a, b) => a[0] - b[0]);
 
             const sequenceOffset = componentData.tooltipIndexOffset ?? 1;
-            const sequenceTotal = Math.max(0, sorted.length - sequenceOffset);
+            const sequenceTotal = sorted.filter(([, record]) =>
+                record.kind === undefined ||
+                record.kind === "interaction"
+            ).length - sequenceOffset;
+            let interactionIndex = 0;
             const transformedData = sorted.map(([, record]) => {
+                if (
+                    record.kind === undefined ||
+                    record.kind === "interaction"
+                ) {
+                    interactionIndex += 1;
+                }
                 const key = String(record.index);
                 const v = record.value;
                 return [key, [{
                     select: { index: v, time: record.time },
                     value: v,
                     time: record.time,
-                    sequenceIndex: Math.max(0, record.index - sequenceOffset),
-                    sequenceTotal,
+                    kind: record.kind,
+                    source: record.source,
+                    sequenceIndex: Math.max(
+                        0,
+                        interactionIndex - sequenceOffset
+                    ),
+                    sequenceTotal: Math.max(0, sequenceTotal),
                 }]];
             });
 
@@ -272,6 +490,7 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
                 isSingleSlider: true,
                 tooltipKind: 'slider',
                 tooltipLabel: componentData.tooltipLabel ?? target,
+                mode,
             };
         }
 
@@ -287,7 +506,7 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
             tooltipKind,
             tooltipLabel: componentData.tooltipLabel ?? target,
         };
-    }, [target, registeredComponents]);
+    }, [target, registeredComponents, provenance, mode]);
 
     // ... useEffect for D3 ...
 
@@ -296,9 +515,32 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
     if (chartData.isCheckboxGroup) {
         const { detailedDataEntries, indexDomain } = chartData;
         
-        const sortedEntries = chartData.isRangeSlider || chartData.isSingleSlider
+        const allSortedEntries = chartData.isRangeSlider || chartData.isSingleSlider
             ? [...detailedDataEntries]
             : [...detailedDataEntries].sort((a, b) => a[0].localeCompare(b[0]));
+        const brushEnabled =
+            chartData.isSingleSlider &&
+            normalizeTemporalBrush(temporalBrush) &&
+            allSortedEntries.length > 1;
+        const sortedEntries = brushEnabled
+            ? filterTemporalEntries(allSortedEntries, brushRange)
+            : allSortedEntries;
+        const temporalPlotHeight = Math.max(
+            32,
+            brushEnabled
+                ? TEMPORAL_BRUSH_HEIGHT
+                : sortedEntries.length * 32
+        );
+        const temporalYPositions = getTemporalYPositions(
+            sortedEntries,
+            chartData.mode ?? mode,
+            temporalPlotHeight
+        );
+        const brushYPositions = getTemporalYPositions(
+            allSortedEntries,
+            chartData.mode ?? mode,
+            TEMPORAL_BRUSH_HEIGHT
+        );
         
         // Calculate max index from data if domain is missing or to ensure bounds
         let calculatedMax = 0;
@@ -331,7 +573,10 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
 
         const renderHeader = () => {
             const hasLeftAxisLabel = chartData.isRangeSlider || chartData.isSingleSlider;
-            const leftLabelWidth = hasLeftAxisLabel ? 28 : 0; // reserved width for vertical y-label column
+            const brushWidth = brushEnabled ? 64 : 0;
+            const leftLabelWidth = hasLeftAxisLabel
+                ? brushEnabled ? brushWidth : 28
+                : 0; // reserved width for brush and vertical y-label column
             const leftLabelGap = hasLeftAxisLabel ? 8 : 0;    // gap between y-label and plot
             const plotInset = hasLeftAxisLabel ? 6 : 0;       // inset used in body for endpoints
             const totalLeftGutter = leftLabelWidth + leftLabelGap + plotInset;
@@ -340,7 +585,10 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
             const innerMarginLeft = `${totalLeftGutter}px`;
             
             return (
-                <div style={{ display: 'flex', flexDirection: 'column', width: '100%', marginTop: '8px' }}>
+                <div
+                    data-provenance-chart-target={target}
+                    style={{ display: 'flex', flexDirection: 'column', width: '100%', marginTop: '8px' }}
+                >
                     {/* The Line */}
                     <div data-timeline-axis={target} style={{ width: innerWidthCalc, marginLeft: innerMarginLeft, height: '4px', background: axisColor, borderRadius: '2px', position: 'relative' }}></div>
                     {/* The Labels below */}
@@ -357,9 +605,24 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
         };
 
         const renderBody = () => (
-             <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
+             <div
+                 data-provenance-chart-target={target}
+                 style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start' }}
+             >
+                 {brushEnabled && (
+                     <TemporalBrush
+                         mode={chartData.mode ?? mode}
+                         onRangeChange={handleBrushRangeChange}
+                         positions={brushYPositions}
+                         target={target}
+                         tooltipId={tooltipId}
+                     />
+                 )}
                  {/* Y-Axis Label for Range/Single Slider (Left side, vertical) */}
-                 {(chartData.isRangeSlider || chartData.isSingleSlider) && (
+                 {(
+                     chartData.isRangeSlider ||
+                     (chartData.isSingleSlider && !brushEnabled)
+                 ) && (
                      <div style={{ 
                          writingMode: 'vertical-rl', 
                          transform: 'rotate(180deg)', // Standard rotation for left-side axis labels
@@ -373,7 +636,9 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
                          whiteSpace: 'nowrap',
                          alignSelf: 'center' // Center vertically relative to chart
                      }}>
-                         Sequence of Interactions
+                         {(chartData.mode ?? mode) === "time"
+                             ? "time"
+                             : "Sequence of Interactions"}
                      </div>
                  )}
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto', flexGrow: 1, position: 'relative' }}>
@@ -384,9 +649,17 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
                  */}
                  
                  {chartData.isRangeSlider || chartData.isSingleSlider ? (
-                    <div style={{ position: 'relative', width: '100%' }}>
+                    <div style={{
+                        position: 'relative',
+                        width: '100%',
+                        height: `${temporalPlotHeight}px`,
+                        minHeight: `${temporalPlotHeight}px`,
+                    }}>
                         {/* SVG Overlay for Vertical Lines */}
-                        <svg style={{ position: 'absolute', top: 0, left: '6px', width: 'calc(100% - 12px)', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
+                        <svg
+                            height={temporalPlotHeight}
+                            style={{ position: 'absolute', top: 0, left: '6px', width: 'calc(100% - 12px)', height: `${temporalPlotHeight}px`, pointerEvents: 'none', zIndex: 1 }}
+                        >
                             {sortedEntries.map(([label, records], index) => {
                                 if (index === sortedEntries.length - 1) return null; // Last row has no next row to connect to
                                 
@@ -403,11 +676,8 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
                                 const nextMin = nextRecord.select.index;
                                 const nextMax = nextRecord.unselect ? nextRecord.unselect.index : maxIndex;
                                 
-                                const rowHeight = 24;
-                                const dotRadius = 4; // 8px circle, radius 4
-                                const gap = 8;
-                                const y1 = (index * (rowHeight + gap)) + dotRadius;
-                                const y2 = ((index + 1) * (rowHeight + gap)) + dotRadius;
+                                const y1 = temporalYPositions[index];
+                                const y2 = temporalYPositions[index + 1];
                                 
                                 const x1_min = ((curMin - minIndex) / rangeSpan) * 100;
                                 const x2_min = ((nextMin - minIndex) / rangeSpan) * 100;
@@ -444,7 +714,10 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
                          </svg>
 
                          {/* Rows with Points (No horizontal lines) */}
-                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                         <div style={{
+                             position: 'relative',
+                             height: `${temporalPlotHeight}px`,
+                         }}>
                               {sortedEntries.map(([label, records], index) => {
                                   // Calculate color for the row
                                   const totalRows = sortedEntries.length;
@@ -452,7 +725,15 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
                                   const color = interpolateOranges(0.3 + (relativeIndex * 0.7));
  
                                   return (
-                                  <div key={label} style={{ display: 'flex', alignItems: 'center', height: '24px', position: 'relative' }}>
+                                  <div key={label} style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      height: '24px',
+                                      position: 'absolute',
+                                      top: `${temporalYPositions[index] - 8}px`,
+                                      left: 0,
+                                      right: 0,
+                                  }}>
                                       {/* Timeline takes full space with safe inset for endpoint visibility */}
                                       <div style={{ position: 'absolute', top: 0, left: '6px', width: 'calc(100% - 12px)', height: '100%', background: 'transparent', borderRadius: '3px', zIndex: 0 }}>
                                           {records.map((record, i) => {
@@ -498,6 +779,39 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
                                                         {/* Min Point */}
                                                         <div
                                                             {...lowTooltipProps}
+                                                            role="button"
+                                                            tabIndex={0}
+                                                            data-provenance-temporal-point="true"
+                                                            data-provenance-kind={
+                                                                record.kind ??
+                                                                "interaction"
+                                                            }
+                                                            data-provenance-value={lowValue}
+                                                            aria-label={`Restore ${chartData.tooltipLabel} to ${lowValue}`}
+                                                            onClick={() =>
+                                                                restoreTemporalPoint({
+                                                                    restoreWidgetValue,
+                                                                    target,
+                                                                    record,
+                                                                    range:
+                                                                        chartData.isRangeSlider,
+                                                                })
+                                                            }
+                                                            onKeyDown={event => {
+                                                                if (
+                                                                    event.key === "Enter" ||
+                                                                    event.key === " "
+                                                                ) {
+                                                                    event.preventDefault();
+                                                                    restoreTemporalPoint({
+                                                                        restoreWidgetValue,
+                                                                        target,
+                                                                        record,
+                                                                        range:
+                                                                            chartData.isRangeSlider,
+                                                                    });
+                                                                }
+                                                            }}
                                                             style={{
                                                                 ...lowTooltipProps.style,
                                                                 position: 'absolute',
@@ -507,7 +821,12 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
                                                                 height: '16px',
                                                                 borderRadius: '50%',
                                                                 backgroundColor: 'transparent',
-                                                                zIndex: 2
+                                                                zIndex: 2,
+                                                                cursor: 'pointer',
+                                                                opacity:
+                                                                    record.kind === "sample"
+                                                                        ? 0.7
+                                                                        : 1,
                                                             }}
                                                         >
                                                             <span
@@ -632,7 +951,10 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
             return renderHeader();
         } else if (part === "body") {
             return (
-                <div style={{ padding: '15px', minWidth: '100%', backgroundColor: bgColor, color: textColor, borderRadius: '4px' }}>
+                <div
+                    data-provenance-chart-target={target}
+                    style={{ padding: '15px', minWidth: '100%', backgroundColor: bgColor, color: textColor, borderRadius: '4px' }}
+                >
                     {renderBody()}
                 </div>
             );
@@ -640,7 +962,10 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
 
         // Full view (default) - used for Single Select Dropdown tooltip/dropdown
         return (
-            <div style={{ padding: '15px', minWidth: '100%', backgroundColor: bgColor, color: textColor, borderRadius: '4px' }}>
+            <div
+                data-provenance-chart-target={target}
+                style={{ padding: '15px', minWidth: '100%', backgroundColor: bgColor, color: textColor, borderRadius: '4px' }}
+            >
                 {renderBody()}
                 {renderHeader()}
             </div>
@@ -648,7 +973,13 @@ const Chart = ({ target, part = "full", theme = "dark" }) => {
     }
 
     // Default D3 chart (always full)
-    return <div ref={chartRef} className="sequence-chart"></div>;
+    return (
+        <div
+            ref={chartRef}
+            className="sequence-chart"
+            data-provenance-chart-target={target}
+        />
+    );
 };
 
 export default Chart;
