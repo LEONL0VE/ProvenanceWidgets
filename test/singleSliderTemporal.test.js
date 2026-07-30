@@ -91,3 +91,29 @@ test("restores a clicked Temporal point through the widget registration", () => 
         "history",
     ]]);
 });
+
+test("restores the complete range from either Range Temporal endpoint", () => {
+    const calls = [];
+    const record = {
+        value: [20, 60],
+        select: { index: 20 },
+        unselect: { index: 60 },
+    };
+
+    const restored = restoreTemporalPoint({
+        restoreWidgetValue: (...args) => {
+            calls.push(args);
+            return true;
+        },
+        target: "custom-range-id",
+        record,
+        range: true,
+    });
+
+    assert.equal(restored, true);
+    assert.deepEqual(calls, [[
+        "custom-range-id",
+        [20, 60],
+        "history",
+    ]]);
+});

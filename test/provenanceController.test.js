@@ -221,6 +221,33 @@ test("exports defensive snapshots that callers cannot mutate", () => {
     );
 });
 
+test("records and restores Range Slider values as one low/high interaction", () => {
+    const strategy = createStrategy();
+    const sources = [];
+    const controller = new ProvenanceController({
+        id: "price-range",
+        widgetType: "range-slider",
+        value: [10, 40],
+        strategy,
+        onProvenanceChange: (_provenance, meta) =>
+            sources.push(meta.source),
+    });
+
+    assert.equal(controller.recordInteraction([20, 60]), true);
+    assert.equal(controller.recordInteraction([20, 60]), false);
+    assert.equal(controller.restoreValue([10, 40]), true);
+
+    assert.deepEqual(
+        strategy.inserts.map(insert => insert.value),
+        [[10, 40], [20, 60], [10, 40]]
+    );
+    assert.deepEqual(sources, ["user", "history"]);
+    assert.deepEqual(
+        controller.getSnapshot().currentValue,
+        [10, 40]
+    );
+});
+
 test("can pause and restart time sampling for React lifecycle replay", () => {
     let intervalCount = 0;
     let clearCount = 0;

@@ -119,6 +119,23 @@ const normalizeLegacyValue = (value, widgetType) => {
     ) {
         return value[0];
     }
+    if (widgetType === "range-slider") {
+        if (
+            !Array.isArray(value) ||
+            value.length !== 2 ||
+            !value.every(
+                item =>
+                    typeof item === "number" &&
+                    Number.isFinite(item)
+            ) ||
+            value[0] >= value[1]
+        ) {
+            throw new TypeError(
+                "Range slider provenance values must be " +
+                "finite [lowValue, highValue] pairs with lowValue < highValue"
+            );
+        }
+    }
     return value;
 };
 

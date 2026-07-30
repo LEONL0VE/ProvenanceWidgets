@@ -27,6 +27,7 @@ const TemporalBrush = ({
     positions,
     target,
     tooltipId,
+    widgetType,
 }) => {
     const brushRef = useRef(null);
     const entryCount = positions.length;
@@ -51,7 +52,7 @@ const TemporalBrush = ({
                         {
                             detail: {
                                 id: target,
-                                widget: "slider",
+                                widget: widgetType,
                                 mode,
                                 interaction: "brush-end",
                                 data: {
@@ -82,7 +83,14 @@ const TemporalBrush = ({
         return () => {
             d3.select(brushRef.current).on(".brush", null);
         };
-    }, [entryCount, mode, onRangeChange, positions, target]);
+    }, [
+        entryCount,
+        mode,
+        onRangeChange,
+        positions,
+        target,
+        widgetType,
+    ]);
 
     if (entryCount <= 1) return null;
     const tickStride = Math.max(1, Math.ceil(entryCount / 8));
@@ -113,7 +121,7 @@ const TemporalBrush = ({
         >
             <svg
                 aria-label={
-                    "Drag vertically to zoom Single Slider history"
+                    `Drag vertically to zoom ${widgetType} history`
                 }
                 data-provenance-temporal-brush={target}
                 width="64"
@@ -314,13 +322,45 @@ const Chart = ({
             // records = [{ select: { index: value[0] }, unselect: { index: value[1] } }]
             // And we need to tell the renderer to use the VALUE domain (e.g. 0-100) instead of index domain.
             
-            // Sort by index (time)
-            const sorted = detailedDataEntries.sort((a, b) => a[0] - b[0]);
-            
+            const publicRecords =
+                provenance?.widgetType === "range-slider" &&
+                Array.isArray(provenance.data)
+                    ? provenance.data.map((record, index) => [
+                        index + 1,
+                        {
+                            value: record.value,
+                            time: new Date(record.timestamp),
+                            index: index + 1,
+                            kind: record.kind,
+                            source: record.source,
+                        },
+                    ])
+                    : [];
+            // Public records include the live time-mode sample endpoint, while
+            // RangedProvenance intentionally contains only derived records.
+            const sorted = (
+                publicRecords.length > 0
+                    ? publicRecords
+                    : detailedDataEntries
+            ).sort((a, b) => a[0] - b[0]);
             const sequenceOffset = componentData.tooltipIndexOffset ?? 0;
-            const sequenceTotal = Math.max(0, sorted.length - sequenceOffset);
-            const transformedData = sorted.map(([key, record]) => {
-                const label = `Interaction ${record.index}`; // Or formatted time
+            const hasRecordKinds = sorted.some(
+                ([, record]) => record.kind !== undefined
+            );
+            const sequenceTotal = hasRecordKinds
+                ? sorted.filter(
+                    ([, record]) => record.kind === "interaction"
+                ).length
+                : Math.max(0, sorted.length - sequenceOffset);
+            let interactionIndex = 0;
+            const transformedData = sorted.map(([, record]) => {
+                if (
+                    record.kind === undefined ||
+                    record.kind === "interaction"
+                ) {
+                    interactionIndex += 1;
+                }
+                const label = String(record.index);
                 const min = record.value[0];
                 const max = record.value[1];
                 return [label, [{
@@ -328,7 +368,14 @@ const Chart = ({
                     unselect: { index: max },
                     value: record.value,
                     time: record.time,
-                    sequenceIndex: Math.max(0, record.index - sequenceOffset),
+                    kind: record.kind,
+                    source: record.source,
+                    sequenceIndex: hasRecordKinds
+                        ? interactionIndex
+                        : Math.max(
+                            0,
+                            record.index - sequenceOffset
+                        ),
                     sequenceTotal,
                 }]];
             });
@@ -351,6 +398,7 @@ const Chart = ({
                 isRangeSlider: true, // Flag to customize rendering if needed (e.g. axis labels)
                 tooltipKind: 'range',
                 tooltipLabel: componentData.tooltipLabel ?? target,
+                mode,
             };
         }
 
@@ -519,7 +567,7 @@ const Chart = ({
             ? [...detailedDataEntries]
             : [...detailedDataEntries].sort((a, b) => a[0].localeCompare(b[0]));
         const brushEnabled =
-            chartData.isSingleSlider &&
+            (chartData.isSingleSlider || chartData.isRangeSlider) &&
             normalizeTemporalBrush(temporalBrush) &&
             allSortedEntries.length > 1;
         const sortedEntries = brushEnabled
@@ -616,12 +664,18 @@ const Chart = ({
                          positions={brushYPositions}
                          target={target}
                          tooltipId={tooltipId}
+                         widgetType={
+                             chartData.isRangeSlider
+                                 ? "range-slider"
+                                 : "single-slider"
+                         }
                      />
                  )}
                  {/* Y-Axis Label for Range/Single Slider (Left side, vertical) */}
                  {(
-                     chartData.isRangeSlider ||
-                     (chartData.isSingleSlider && !brushEnabled)
+                     (chartData.isRangeSlider ||
+                         chartData.isSingleSlider) &&
+                     !brushEnabled
                  ) && (
                      <div style={{ 
                          writingMode: 'vertical-rl', 
@@ -787,7 +841,17 @@ const Chart = ({
                                                                 "interaction"
                                                             }
                                                             data-provenance-value={lowValue}
-                                                            aria-label={`Restore ${chartData.tooltipLabel} to ${lowValue}`}
+                                                            aria-label={
+                                                                chartData.isRangeSlider
+                                                                    ? (
+                                                                        `Restore ${chartData.tooltipLabel} ` +
+                                                                        `to ${lowValue}–${highValue}`
+                                                                    )
+                                                                    : (
+                                                                        `Restore ${chartData.tooltipLabel} ` +
+                                                                        `to ${lowValue}`
+                                                                    )
+                                                            }
                                                             onClick={() =>
                                                                 restoreTemporalPoint({
                                                                     restoreWidgetValue,
@@ -848,6 +912,40 @@ const Chart = ({
                                                        {chartData.isRangeSlider && (
                                                            <div
                                                                {...highTooltipProps}
+                                                               role="button"
+                                                               tabIndex={0}
+                                                               data-provenance-temporal-point="true"
+                                                               data-provenance-kind={
+                                                                   record.kind ??
+                                                                   "interaction"
+                                                               }
+                                                               data-provenance-value={highValue}
+                                                               aria-label={
+                                                                   `Restore ${chartData.tooltipLabel} ` +
+                                                                   `to ${lowValue}–${highValue}`
+                                                               }
+                                                               onClick={() =>
+                                                                   restoreTemporalPoint({
+                                                                       restoreWidgetValue,
+                                                                       target,
+                                                                       record,
+                                                                       range: true,
+                                                                   })
+                                                               }
+                                                               onKeyDown={event => {
+                                                                   if (
+                                                                       event.key === "Enter" ||
+                                                                       event.key === " "
+                                                                   ) {
+                                                                       event.preventDefault();
+                                                                       restoreTemporalPoint({
+                                                                           restoreWidgetValue,
+                                                                           target,
+                                                                           record,
+                                                                           range: true,
+                                                                       });
+                                                                   }
+                                                               }}
                                                                style={{
                                                                    ...highTooltipProps.style,
                                                                    position: 'absolute',
@@ -857,7 +955,12 @@ const Chart = ({
                                                                    height: '16px',
                                                                    borderRadius: '50%',
                                                                    backgroundColor: 'transparent',
-                                                                   zIndex: 2
+                                                                   zIndex: 2,
+                                                                   cursor: 'pointer',
+                                                                   opacity:
+                                                                       record.kind === "sample"
+                                                                           ? 0.7
+                                                                           : 1,
                                                                }}
                                                            >
                                                                <span

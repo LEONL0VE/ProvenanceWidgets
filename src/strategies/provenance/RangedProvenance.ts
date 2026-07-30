@@ -174,12 +174,26 @@ export default class RangedProvenance extends Provenance<
     this.boundEdges(newEntries);
   }
 
-  insert(value: SliderValue, options: { caller?: Key; time?: Date } = {}) {
-    const { caller } = options;
+  insert(
+    value: SliderValue,
+    options: {
+      caller?: Key;
+      time?: Date;
+      kind?: TemporalRecord["kind"];
+      source?: TemporalRecord["source"];
+    } = {}
+  ) {
+    const { caller, kind, source } = options;
     const time = this.updateTime(options.time);
     const index = this.domain.get("index")![1] + 1;
 
-    this.detailedData.set(index, { value, time, index });
+    this.detailedData.set(index, {
+      value,
+      time,
+      index,
+      ...(kind ? { kind } : {}),
+      ...(source ? { source } : {}),
+    });
     this.domain.set("index", [0, index]);
 
     const [lowValue, highValue] = value;
@@ -199,7 +213,7 @@ export default class RangedProvenance extends Provenance<
       ]);
       this.dispatchEvent(
         new CustomEvent(UNILATERAL_GUIDANCE_EVENT_NAME, {
-          detail: { ...this, caller },
+          detail: { ...this, caller, kind, source },
         })
       );
       return this;
@@ -312,7 +326,7 @@ export default class RangedProvenance extends Provenance<
     this.aggregateData = new Map(newEntries);
     this.dispatchEvent(
       new CustomEvent(UNILATERAL_GUIDANCE_EVENT_NAME, {
-        detail: { ...this, caller },
+        detail: { ...this, caller, kind, source },
       })
     );
     return this;

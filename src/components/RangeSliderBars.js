@@ -8,6 +8,7 @@ const RangeSliderBars = ({
     height,
     colorScheme,
     getBarProps,
+    onRangeSelect,
 }) => {
     const segments = getRangeBarSegments(guidance, min, max);
     const maxCount = Math.max(1, ...segments.map(segment => segment.count));
@@ -50,12 +51,43 @@ const RangeSliderBars = ({
                         {segment.time && (
                             <rect
                                 {...tooltipProps}
+                                role="button"
+                                tabIndex={0}
+                                data-provenance-aggregate-range={
+                                    `${segment.low},${segment.high}`
+                                }
+                                aria-label={
+                                    `Restore range to ${segment.low}–${segment.high}`
+                                }
+                                onClick={() => onRangeSelect?.(
+                                    [segment.low, segment.high],
+                                    'history'
+                                )}
+                                onKeyDown={event => {
+                                    if (
+                                        event.key === 'Enter' ||
+                                        event.key === ' '
+                                    ) {
+                                        event.preventDefault();
+                                        onRangeSelect?.(
+                                            [segment.low, segment.high],
+                                            'history'
+                                        );
+                                    }
+                                }}
                                 x={x(segment.low)}
                                 y={0}
                                 width={x(segment.high) - x(segment.low)}
                                 height={height}
                                 fill="transparent"
                                 stroke="none"
+                                pointerEvents="all"
+                                style={{
+                                    ...tooltipProps.style,
+                                    cursor: onRangeSelect
+                                        ? 'pointer'
+                                        : 'default',
+                                }}
                             />
                         )}
                     </g>

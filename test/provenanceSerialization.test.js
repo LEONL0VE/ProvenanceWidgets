@@ -70,6 +70,34 @@ test("normalizes the V1 selections format without changing array values", () => 
     assert.equal(result.data[0].timestamp, "2026-07-30T01:02:03.000Z");
 });
 
+test("normalizes V1 Range Slider history as low/high pairs", () => {
+    const result = normalizeSerializedProvenance({
+        data: [
+            {
+                value: [10, 40],
+                timestamp: "2026-07-30T01:02:03.000Z",
+            },
+            {
+                value: [20, 70],
+                timestamp: "2026-07-30T01:02:04.000Z",
+            },
+        ],
+    }, {
+        ...options,
+        widgetId: "price-range",
+        widgetType: "range-slider",
+    });
+
+    assert.deepEqual(
+        result.data.map(record => record.value),
+        [[10, 40], [20, 70]]
+    );
+    assert.deepEqual(
+        result.data.map(record => record.kind),
+        ["baseline", "interaction"]
+    );
+});
+
 test("creates a JSON-safe defensive copy of public provenance values", () => {
     const source = {
         range: [20, 40],
@@ -128,6 +156,22 @@ test("rejects invalid public provenance instead of silently corrupting it", () =
     assert.throws(
         () => cloneProvenanceValue(new Map([["value", 20]])),
         /arrays or plain objects/
+    );
+    assert.throws(
+        () => normalizeSerializedProvenance(
+            {
+                data: [{
+                    value: [40, 20],
+                    timestamp: "2026-07-30T01:02:03.000Z",
+                }],
+            },
+            {
+                ...options,
+                widgetId: "price-range",
+                widgetType: "range-slider",
+            }
+        ),
+        /finite \[lowValue, highValue\] pairs/
     );
 });
 

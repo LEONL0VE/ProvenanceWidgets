@@ -1,164 +1,431 @@
-import { Slider as Slider_ } from 'primereact/slider/slider.esm.js';
-import { useEffect, useRef, useState } from 'react';
-import RangedProvenance from '../strategies/provenance/RangedProvenance.ts';
-import { UNILATERAL_GUIDANCE_EVENT_NAME } from '../constants.ts';
-import useProvenance from './hooks/useProvenance.js';
-import { interpolateOranges } from 'd3';
-import useElementSize from './hooks/useElementSize.js';
-import useRevertedValue from './hooks/useRevertedValue.js';
-import Chart from './Chart.js';
-import RangeSliderBars from './RangeSliderBars.js';
-import useProvenanceTooltip from './hooks/useProvenanceTooltip.js';
-import { formatAggregateTooltip, getTooltipAnchorProps } from './provenanceTooltip.js';
+import { Slider as Slider_ } from "primereact/slider/slider.esm.js";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
+import { interpolateOranges } from "d3";
+import RangedProvenance from "../strategies/provenance/RangedProvenance.ts";
+import { UNILATERAL_GUIDANCE_EVENT_NAME } from "../constants.ts";
+import useProvenanceController from "./hooks/useProvenanceController.js";
+import useRevertedValue from "./hooks/useRevertedValue.js";
+import useWidgetRegistry from "./hooks/useWidgetRegistry.js";
+import useElementSize from "./hooks/useElementSize.js";
+import useProvenanceTooltip from "./hooks/useProvenanceTooltip.js";
+import Chart from "./Chart.js";
+import RangeSliderBars from "./RangeSliderBars.js";
+import {
+    callRangeSliderCallbacks,
+    getControlledRangeSliderValue,
+    getInitialRangeSliderValue,
+    normalizeRangeSliderValue,
+    rangeSliderValueKey,
+    rangeSliderValuesEqual,
+} from "./rangeSliderValue.js";
+import {
+    formatAggregateTooltip,
+    getTooltipAnchorProps,
+} from "./provenanceTooltip.js";
 
-// { id, stateItem, setStateItem, max, min = 0, step = 1 }
+/**
+ * V2 Range Slider with the PW 1.0 interaction contract.
+ *
+ * The current React `value={[low, high]}` API and the V1-style
+ * `value={low} highValue={high} options={...}` API are both supported.
+ * Handles update during a drag, while provenance is recorded once when the
+ * drag ends, matching V1's `userChangeEnd` behavior.
+ */
 const Rangeslider = (props) => {
+    const options = props.options ?? {};
+    const min = props.min ?? options.floor ?? 0;
+    const max = props.max ?? options.ceil ?? 100;
+    const step = props.step ?? options.step ?? 1;
+    const initialValueRef = useRef(
+        getInitialRangeSliderValue(props, min, max)
+    );
+    const tooltipLabel =
+        props.dataLabel ?? props["data-label"] ?? props.id;
+    const visualize = props.visualize ?? true;
+    const temporalBrush =
+        props.temporalBrush ??
+        props.enableTemporalBrush ??
+        false;
     const tooltipId = useProvenanceTooltip();
     const [revertedValue] = useRevertedValue(props.id);
-    const [, setRegisteredComponents] = useProvenance()
+    const {
+        registerWidget,
+        notifyWidget,
+    } = useWidgetRegistry();
     const [isDropdownVisible, setDropdownVisible] = useState(false);
-    const [curr, setCurr] = useState()
-    const min = props.min ?? 0;
-    const max = props.max ?? 100;
-    const tooltipLabel = props['data-label'] || props.id;
+    const [measureContainer, { width: containerWidth }] =
+        useElementSize();
+    const elementRef = useRef(null);
+    const propsRef = useRef(props);
+    propsRef.current = props;
 
-    // Listen for provenance-dropdown-toggle for this input
+    const strategyFactory = useMemo(
+        () => () => {
+            const strategy = new RangedProvenance(min, max);
+            strategy.tooltipLabel = tooltipLabel;
+            strategy.tooltipIndexOffset = 1;
+            return strategy;
+        },
+        [min, max, tooltipLabel]
+    );
+
+    const {
+        currentValue,
+        strategy,
+        hasProvenance,
+        provenance: serializedProvenance,
+        mode: provenanceMode,
+        recordInteraction,
+        recordExternalChange,
+        restoreValue,
+    } = useProvenanceController({
+        id: props.id,
+        widgetType: "range-slider",
+        // Range controls need to distinguish parent echoes during a drag from
+        // genuine external changes. Keep this hook input stable and perform
+        // the controlled-value comparison below.
+        value: initialValueRef.current,
+        provenance: props.provenance,
+        mode: props.mode,
+        sampleIntervalMs: props.sampleIntervalMs,
+        freeze: props.freeze,
+        visualize,
+        onProvenanceChange:
+            props.onProvenanceChange ?? props.provenanceChange,
+        strategyFactory,
+        valuesEqual: rangeSliderValuesEqual,
+    });
+    const [displayValue, setDisplayValue] = useState(currentValue);
+    const currentValueRef = useRef(currentValue);
+    currentValueRef.current = currentValue;
+    const currentValueKey = rangeSliderValueKey(currentValue);
+    const serializedProvenanceRef = useRef(serializedProvenance);
+    serializedProvenanceRef.current = serializedProvenance;
+    const emittedValueKeyRef = useRef(null);
+    const controlledValue = getControlledRangeSliderValue(
+        props,
+        min,
+        max
+    );
+    const controlledValueKey = rangeSliderValueKey(controlledValue);
+    const previousControlledKeyRef = useRef(controlledValueKey);
+    const previousProvenanceRef = useRef(props.provenance);
+
     useEffect(() => {
-        const handleToggle = (e) => {
-            if (e.detail && e.detail.target === props.id) {
-                setDropdownVisible(e.detail.open);
+        const normalized = normalizeRangeSliderValue(
+            currentValue,
+            min,
+            max
+        );
+        if (normalized) setDisplayValue(normalized);
+        // Controller snapshots defensively clone range arrays. Depending on
+        // the array reference here would therefore reset the handles to the
+        // last committed value after every drag render. A structural key only
+        // synchronizes when the committed range actually changes.
+    }, [currentValueKey, min, max]);
+
+    // A controlled parent echoes each intermediate drag value back through
+    // props. Those echoes only move the handles; a genuinely new parent value
+    // is recorded as an external provenance interaction.
+    useEffect(() => {
+        const provenanceChanged =
+            props.provenance !== previousProvenanceRef.current;
+        const controlledChanged =
+            controlledValueKey !== previousControlledKeyRef.current;
+
+        if (controlledValue && controlledChanged) {
+            setDisplayValue(controlledValue);
+            if (
+                emittedValueKeyRef.current === controlledValueKey ||
+                provenanceChanged
+            ) {
+                emittedValueKeyRef.current = null;
+            } else {
+                recordExternalChange(controlledValue, {
+                    caller: "controlled-value",
+                });
             }
+        }
+
+        previousControlledKeyRef.current = controlledValueKey;
+        previousProvenanceRef.current = props.provenance;
+    }, [
+        controlledValueKey,
+        props.provenance,
+        recordExternalChange,
+        min,
+        max,
+    ]);
+
+    const applyRegisteredValue = useCallback(
+        (nextValue, source = "history") => {
+            const normalized = normalizeRangeSliderValue(
+                nextValue,
+                min,
+                max
+            );
+            if (!normalized) return false;
+
+            const changed = restoreValue(normalized, {
+                caller: source,
+            });
+            setDisplayValue(normalized);
+            callRangeSliderCallbacks(
+                propsRef.current,
+                normalized,
+                { source }
+            );
+            return changed;
+        },
+        [restoreValue, min, max]
+    );
+
+    const setContainerRef = useCallback(node => {
+        elementRef.current = node;
+        measureContainer(node);
+    }, [measureContainer]);
+
+    useEffect(() => {
+        if (!strategy) return undefined;
+
+        strategy.hasUserInteracted = hasProvenance;
+        strategy.tooltipLabel = tooltipLabel;
+        strategy.tooltipIndexOffset = 1;
+        notifyWidget(props.id);
+        return undefined;
+    }, [
+        strategy,
+        hasProvenance,
+        tooltipLabel,
+        props.id,
+        notifyWidget,
+    ]);
+
+    useEffect(() => {
+        if (!strategy) return undefined;
+
+        const registration = {
+            id: props.id,
+            type: "range-slider",
+            provenance: strategy,
+            getProvenance: () => serializedProvenanceRef.current,
+            elementRef,
+            getValue: () => currentValueRef.current,
+            setValue: applyRegisteredValue,
+            visualize,
+            mode: provenanceMode,
+            focus: () => {
+                const element = elementRef.current;
+                element?.scrollIntoView?.({
+                    behavior: "smooth",
+                    block: "center",
+                });
+                (
+                    element?.querySelector?.('[role="slider"]') ??
+                    element
+                )?.focus?.();
+            },
         };
-        window.addEventListener('provenance-dropdown-toggle', handleToggle);
-        return () => window.removeEventListener('provenance-dropdown-toggle', handleToggle);
+        const unregister = registerWidget(registration);
+        const refreshRegistry = () => notifyWidget(props.id);
+        strategy.addEventListener(
+            UNILATERAL_GUIDANCE_EVENT_NAME,
+            refreshRegistry
+        );
+
+        return () => {
+            strategy.removeEventListener(
+                UNILATERAL_GUIDANCE_EVENT_NAME,
+                refreshRegistry
+            );
+            unregister();
+        };
+    }, [
+        strategy,
+        props.id,
+        applyRegisteredValue,
+        registerWidget,
+        notifyWidget,
+        visualize,
+        provenanceMode,
+    ]);
+
+    useEffect(() => {
+        const handleToggle = event => {
+            if (event.detail?.target !== props.id) return;
+            setDropdownVisible(Boolean(event.detail.open));
+        };
+        window.addEventListener(
+            "provenance-dropdown-toggle",
+            handleToggle
+        );
+        return () => window.removeEventListener(
+            "provenance-dropdown-toggle",
+            handleToggle
+        );
     }, [props.id]);
 
     useEffect(() => {
-        if (revertedValue !== undefined && Array.isArray(revertedValue) && curr) {
-            props.onChange(revertedValue);
-            curr.insert(revertedValue);
-            lastInsertedRef.current = JSON.stringify(revertedValue);
-        }
-    }, [revertedValue, curr]);
-    const lastInsertedRef = useRef(null)
-    const [containerRef, { width: containerWidth }] = useElementSize();
+        if (revertedValue === undefined) return;
+        applyRegisteredValue(revertedValue, "history");
+    }, [revertedValue, applyRegisteredValue]);
 
-    useEffect(() => {
-        const sliderProvenance = new RangedProvenance(min, max);
-        sliderProvenance.tooltipLabel = tooltipLabel;
-        sliderProvenance.tooltipIndexOffset = 1;
-        // Match PW 1.0: retain the controlled original range as a baseline,
-        // but do not draw provenance or enable its footprint before a real
-        // slider interaction occurs.
-        sliderProvenance.hasUserInteracted = false;
+    const handleChange = event => {
+        const nextValue = normalizeRangeSliderValue(
+            event.value,
+            min,
+            max
+        );
+        if (!nextValue) return;
 
-        if (Array.isArray(props.value) && props.value.length === 2) {
-            const initialRange = [...props.value]
-                .map(Number)
-                .sort((a, b) => a - b);
-            if (
-                initialRange.every(Number.isFinite) &&
-                initialRange[0] < initialRange[1]
-            ) {
-                sliderProvenance.insert(initialRange);
-                lastInsertedRef.current = JSON.stringify(initialRange);
-            }
-        }
+        emittedValueKeyRef.current = rangeSliderValueKey(nextValue);
+        setDisplayValue(nextValue);
+        callRangeSliderCallbacks(props, nextValue, event, {
+            includeSelection: false,
+        });
+    };
 
-        setCurr(sliderProvenance)
-        setRegisteredComponents(prev => {
-            const newMap = prev instanceof Map ? new Map(prev) : new Map()
-            newMap.set(props.id, sliderProvenance)
-            return newMap
-        })
+    const handleSlideEnd = event => {
+        const nextValue = normalizeRangeSliderValue(
+            event.value ?? displayValue,
+            min,
+            max
+        );
+        if (!nextValue) return;
 
-        sliderProvenance.addEventListener(UNILATERAL_GUIDANCE_EVENT_NAME, v => {
-            // Bump reference so consumers re-render and can read updated provenance
-            setRegisteredComponents(prev => {
-                if (prev instanceof Map) {
-                    return new Map(prev)
-                }
-                // Fallback: create new Map if prev is not a Map
-                return new Map()
-            })
-        })
-    }, [])
-
-    const onProvChange = (val) => {
-        if (!curr || !Array.isArray(val) || val.length !== 2) return
-        const values = [...val].map(Number).sort((a, b) => a - b)
-        if (!values.every(Number.isFinite) || values[0] >= values[1]) return
-
-        const key = JSON.stringify(values)
-        if (lastInsertedRef.current === key) return
-
-        curr.hasUserInteracted = true
-        curr.insert(values)
-        lastInsertedRef.current = key
-    }
+        recordInteraction(nextValue);
+        setDisplayValue(nextValue);
+        callRangeSliderCallbacks(props, nextValue, event, {
+            includeChange: false,
+        });
+    };
 
     return (
-        <div ref={containerRef} style={{ marginTop: "1rem", width: "100%", position: 'relative' }}>
-            <div style={{ position: 'relative', width: '100%', height: '52px' }}>
-                {containerWidth > 0 && curr?.hasUserInteracted &&
-                    <div style={{ position: 'absolute', left: 0, bottom: '2px', lineHeight: 0 }}>
-                        <RangeSliderBars
-                            guidance={curr}
-                            colorScheme={interpolateOranges}
-                            min={min}
-                            max={max}
-                            width={containerWidth}
-                            height={50}
-                            getBarProps={(value, record) => getTooltipAnchorProps(
-                                tooltipId,
-                                formatAggregateTooltip({
-                                    label: tooltipLabel,
-                                    value,
-                                    record,
-                                    kind: 'range',
-                                    sequenceIndex: Math.max(0, (record.index ?? 1) - 1),
-                                    sequenceTotal: Math.max(0, (curr.detailedData?.size ?? 1) - 1),
-                                })
-                            )}
-                        />
-                    </div>
-                }
-                <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", width: "100%" }}>
+        <div
+            ref={setContainerRef}
+            data-label={tooltipLabel}
+            style={{
+                marginTop: "1rem",
+                width: "100%",
+                position: "relative",
+            }}
+        >
+            <div
+                style={{
+                    position: "relative",
+                    width: "100%",
+                    height: "52px",
+                }}
+            >
+                {visualize &&
+                    containerWidth > 0 &&
+                    hasProvenance && (
+                        <div
+                            style={{
+                                position: "absolute",
+                                left: 0,
+                                bottom: "2px",
+                                lineHeight: 0,
+                            }}
+                        >
+                            <RangeSliderBars
+                                guidance={strategy}
+                                colorScheme={interpolateOranges}
+                                min={min}
+                                max={max}
+                                width={containerWidth}
+                                height={50}
+                                onRangeSelect={applyRegisteredValue}
+                                getBarProps={(value, record) =>
+                                    getTooltipAnchorProps(
+                                        tooltipId,
+                                        formatAggregateTooltip({
+                                            label: tooltipLabel,
+                                            value,
+                                            record,
+                                            kind: "range",
+                                            sequenceIndex: Math.max(
+                                                0,
+                                                (record.index ?? 1) - 1
+                                            ),
+                                            sequenceTotal: Math.max(
+                                                0,
+                                                (
+                                                    strategy.detailedData
+                                                        ?.size ?? 1
+                                                ) - 1
+                                            ),
+                                        })
+                                    )
+                                }
+                            />
+                        </div>
+                    )}
+                <div
+                    style={{
+                        position: "absolute",
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        width: "100%",
+                    }}
+                >
                     <Slider_
+                        {...props.sliderProps}
                         range
-                        style={{ width: "100%" }}
-                        step={props.step}
+                        aria-label={
+                            props["aria-label"] ?? tooltipLabel
+                        }
+                        style={{
+                            width: "100%",
+                            ...props.sliderProps?.style,
+                        }}
+                        step={step}
                         max={max}
                         min={min}
-                        value={props.value}
-                        // Keep the controlled handles synchronized throughout
-                        // the drag so they follow the pointer like PW 1.0.
-                        onChange={e => props.onChange(e.value)}
-                        // Persist one provenance interaction per completed drag,
-                        // rather than recording every intermediate pixel/step.
-                        onSlideEnd={e => onProvChange(e.value)}
+                        value={displayValue}
+                        onChange={handleChange}
+                        onSlideEnd={handleSlideEnd}
                     />
                 </div>
             </div>
 
-            {isDropdownVisible && (
-                <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    width: '100%',
-                    border: '1px solid #ccc',
-                    backgroundColor: '#fff', // White background
-                    zIndex: 1000,
-                    borderRadius: '4px',
-                    marginTop: '5px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-                }}>
-                   <Chart target={props.id} theme="light" />
+            {visualize && isDropdownVisible && (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        width: "100%",
+                        border: "1px solid #ccc",
+                        backgroundColor: "#fff",
+                        zIndex: 1000,
+                        borderRadius: "4px",
+                        marginTop: "5px",
+                        boxShadow:
+                            "0 4px 6px -1px rgba(0, 0, 0, 0.1), " +
+                            "0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+                    }}
+                >
+                    <Chart
+                        target={props.id}
+                        theme="light"
+                        provenance={serializedProvenance}
+                        mode={provenanceMode}
+                        temporalBrush={temporalBrush}
+                    />
                 </div>
             )}
         </div>
-    )
-}
+    );
+};
 
-export default Rangeslider 
+export default Rangeslider;
