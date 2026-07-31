@@ -1,155 +1,182 @@
-import { Checkbox as Checkbox_ } from 'primereact/checkbox/checkbox.esm.js';
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { useCheckboxGroup } from './CheckboxGroup.js';
-import Bars from 'scents';
-import { interpolateOranges } from 'd3';
-import { getScentColor, getContrastColor } from './utils.js';
-import useElementSize from './hooks/useElementSize.js';
-import useRevertedValue from './hooks/useRevertedValue.js';
-import useProvenanceTooltip from './hooks/useProvenanceTooltip.js';
-import TimelineVis from './TimelineVis.js';
+import { Checkbox as Checkbox_ } from "primereact/checkbox/checkbox.esm.js";
+import { useEffect, useMemo, useState } from "react";
+import { interpolateOranges } from "d3";
+import Bars from "scents";
+import { useCheckboxGroup } from "./checkboxGroupContext.js";
+import useElementSize from "./hooks/useElementSize.js";
+import useProvenanceTooltip from "./hooks/useProvenanceTooltip.js";
+import TimelineVis from "./TimelineVis.js";
+import DropdownBarLabel from "./DropdownBarLabel.js";
 import {
     formatAggregateTooltip,
-    getTemporalRowTooltipProps,
     getAggregateTooltipRecord,
     getTooltipAnchorProps,
-} from './provenanceTooltip.js';
+} from "./provenanceTooltip.js";
 
-const Checkbox = ({ label }) => {
-    const [check, setCheck] = useState(false)
+const valuesEqual = (left, right) =>
+    Object.is(left, right) ||
+    (
+        left !== null &&
+        right !== null &&
+        String(left) === String(right)
+    );
+
+/**
+ * One option in a CheckboxGroup.
+ *
+ * The group owns the selected array and provenance. Standalone controlled
+ * and uncontrolled behavior remains available for compatibility.
+ */
+const Checkbox = ({
+    id: _id,
+    label,
+    displayLabel,
+    value: valueProp,
+    checked: checkedProp,
+    defaultChecked = false,
+    inputId,
+    name,
+    disabled,
+    tabindex,
+    tabIndex,
+    ariaLabel,
+    ariaLabelledBy,
+    onChange,
+    selectedChange,
+    className,
+    styleClass,
+    style,
+    containerClassName,
+    containerStyle,
+    labelStyle,
+    labelStyleClass,
+    ...primeProps
+}) => {
     const checkboxGroup = useCheckboxGroup();
-    const [revertedValue] = useRevertedValue(checkboxGroup?.id);
-    const [showTimeline, setShowTimeline] = useState(false);
-    const tooltipId = useProvenanceTooltip();
-    const [axisOffsetPx, setAxisOffsetPx] = useState(0);
-    const timelineVersion = checkboxGroup?.guidance?.domain?.get?.("index")?.[1] ?? 0;
+    const value = valueProp ?? label;
+    const [standaloneChecked, setStandaloneChecked] =
+        useState(checkedProp ?? defaultChecked);
+    const [containerRef, { width: containerWidth }] =
+        useElementSize();
+    const tooltip = useProvenanceTooltip();
+    const guidance = checkboxGroup?.guidance;
+    const hasProvenance =
+        checkboxGroup?.hasProvenance ?? false;
+    const visualize = checkboxGroup?.visualize ?? true;
+    const showTimeline =
+        checkboxGroup?.showTimeline ?? false;
+    const provenanceMode =
+        checkboxGroup?.mode ?? "interaction";
+    const timelineVersion =
+        guidance?.domain?.get?.("index")?.[1] ?? 0;
+    const timeVersion =
+        guidance?.domain?.get?.("time")?.[2] ?? 0;
+    const visibleLabel =
+        displayLabel ?? label ?? value ?? "";
+    const resolvedInputId =
+        inputId ??
+        `${checkboxGroup?.id ?? "checkbox"}-${String(value)}`;
+    const checked = checkboxGroup
+        ? checkboxGroup.selected.some(selected =>
+            valuesEqual(selected, value)
+        )
+        : checkedProp ?? standaloneChecked;
 
     useEffect(() => {
-        const handleToggle = (e) => {
-            if (e.detail && e.detail.target === checkboxGroup?.id) {
-                setShowTimeline(e.detail.open);
-            }
-        };
-        window.addEventListener('provenance-timeline-toggle', handleToggle);
-        return () => window.removeEventListener('provenance-timeline-toggle', handleToggle);
-    }, [checkboxGroup?.id]);
-
-    useEffect(() => {
-        if (revertedValue && Array.isArray(revertedValue)) {
-            setCheck(revertedValue.includes(label));
-            // Update ref in group to keep it in sync with physical state
-            if (checkboxGroup && checkboxGroup.updateCheckboxState) {
-                // We don't want to trigger a NEW provenance insertion here, 
-                // but the current implementation of updateCheckboxState triggers one.
-                // We should probably refine updateCheckboxState to only insert if NOT in "reverting" mode.
-                // However, the requested task is to "set the value of each widget".
-            }
+        if (checkedProp !== undefined) {
+            setStandaloneChecked(Boolean(checkedProp));
         }
-    }, [revertedValue, label]);
-    const [containerRef, { width: containerWidth }] = useElementSize();
-    const containerElRef = useRef(null);
-    const setCombinedRef = (node) => {
-        containerElRef.current = node;
-        containerRef(node);
-    };
+    }, [checkedProp]);
 
     useEffect(() => {
-        if (!showTimeline || !checkboxGroup?.id) return;
-
-        const compute = () => {
-            const axisEl = document.querySelector(`[data-timeline-axis="${checkboxGroup.id}"]`);
-            const rowEl = containerElRef.current;
-            if (!axisEl || !rowEl) return;
-
-            const axisLeft = axisEl.getBoundingClientRect().left;
-            const rowLeft = rowEl.getBoundingClientRect().left;
-            const nextOffset = Math.max(0, Math.round(axisLeft - rowLeft));
-            setAxisOffsetPx(nextOffset);
-        };
-
-        const raf = requestAnimationFrame(compute);
-        window.addEventListener('resize', compute);
-        return () => {
-            cancelAnimationFrame(raf);
-            window.removeEventListener('resize', compute);
-        };
-    }, [showTimeline, checkboxGroup?.id]);
-
-    // Register this checkbox with the group when it mounts
-    useEffect(() => {
-        if (checkboxGroup && checkboxGroup.registerCheckbox) {
-            checkboxGroup.registerCheckbox(label);
-        }
-    }, [label, checkboxGroup]);
+        if (!checkboxGroup?.registerCheckbox) return undefined;
+        return checkboxGroup.registerCheckbox({ value });
+    }, [
+        checkboxGroup?.registerCheckbox,
+        value,
+    ]);
 
     const timelineData = useMemo(() => {
-        if (!showTimeline || !checkboxGroup?.guidance?.detailedData) return null;
-        
-        const detailedData = checkboxGroup.guidance.detailedData;
-        // detailedData is Map<label, records>
-        const records = detailedData.get(label);
+        if (
+            !showTimeline ||
+            !hasProvenance ||
+            !guidance?.detailedData
+        ) {
+            return null;
+        }
+        const records = guidance.detailedData.get(value);
         if (!records) return null;
 
-        // Calculate max index for the entire group
         let maxIndex = 0;
-        const allRecords = Array.from(detailedData.values()).flat();
-        for (const record of allRecords) {
-            if (record.select?.index > maxIndex) maxIndex = record.select.index;
-            if (record.unselect?.index > maxIndex) maxIndex = record.unselect.index;
+        for (const optionRecords of guidance.detailedData.values()) {
+            for (const record of optionRecords) {
+                maxIndex = Math.max(
+                    maxIndex,
+                    record.select?.index ?? 0,
+                    record.unselect?.index ?? 0
+                );
+            }
         }
-        
-        // Also check domain if available
-        const domainMax = checkboxGroup.guidance.domain?.get ? checkboxGroup.guidance.domain.get("index")?.[1] : 0;
-        const displayMax = Math.max(maxIndex, domainMax || 0, 1) + 1;
+        const domainMax =
+            guidance.domain?.get?.("index")?.[1] ?? 0;
+        return {
+            records,
+            maxIndex: Math.max(maxIndex, domainMax) + 1,
+        };
+    }, [
+        showTimeline,
+        hasProvenance,
+        guidance,
+        value,
+        timelineVersion,
+        timeVersion,
+    ]);
 
-        return { records, maxIndex: displayMax };
-    }, [showTimeline, checkboxGroup?.guidance, label, timelineVersion]);
-
-    const handleChange = (e) => {
-        const newChecked = e.checked;
-        setCheck(newChecked);
-        // Update the checkbox state in the group
-        if (checkboxGroup && checkboxGroup.updateCheckboxState) {
-            checkboxGroup.updateCheckboxState(label, newChecked);
-        }
-    }
-
-    const rowTooltipProps = !showTimeline
-        ? getTooltipAnchorProps(
-            tooltipId,
-            formatAggregateTooltip({
-                label: checkboxGroup?.tooltipLabel ?? checkboxGroup?.id,
-                value: label,
-                record: getAggregateTooltipRecord(
-                    checkboxGroup?.guidance,
-                    label,
-                    'multi-selection'
-                ),
-                kind: 'multi-selection',
-            }),
-            { focusable: false }
-        )
-        : timelineData
-            ? getTemporalRowTooltipProps(tooltipId, {
-                records: timelineData.records,
-                maxIndex: timelineData.maxIndex,
-                getBounds: () => {
-                    const rect = containerElRef.current?.getBoundingClientRect();
-                    return rect
-                        ? { left: rect.left + axisOffsetPx, right: rect.right }
-                        : null;
-                },
-                label: checkboxGroup?.tooltipLabel ?? checkboxGroup?.id,
-                value: label,
-                kind: 'multi-selection',
-            })
+    const aggregateTooltipProps =
+        visualize && hasProvenance && !showTimeline
+            ? getTooltipAnchorProps(
+                tooltip,
+                () => formatAggregateTooltip({
+                    label:
+                        checkboxGroup?.tooltipLabel ??
+                        checkboxGroup?.id,
+                    value,
+                    record: getAggregateTooltipRecord(
+                        guidance,
+                        value,
+                        "multi-selection"
+                    ),
+                    kind: "multi-selection",
+                }),
+                { focusable: false }
+            )
             : {};
+
+    const handleChange = event => {
+        if (disabled || primeProps.readonly) return;
+        const nextChecked = Boolean(event.checked);
+        onChange?.(event);
+        selectedChange?.(value, nextChecked, event);
+        if (checkboxGroup?.setCheckboxValue) {
+            checkboxGroup.setCheckboxValue(
+                value,
+                nextChecked,
+                event
+            );
+        } else if (checkedProp === undefined) {
+            setStandaloneChecked(nextChecked);
+        }
+    };
 
     return (
         <div
-            {...rowTooltipProps}
+            {...aggregateTooltipProps}
+            data-provenance-chart-target={checkboxGroup?.id}
+            data-provenance-option={value}
+            className={containerClassName}
             style={{
-                ...rowTooltipProps.style,
+                ...aggregateTooltipProps.style,
+                ...containerStyle,
                 display: "flex",
                 alignItems: "center",
                 gap: "5px",
@@ -157,52 +184,140 @@ const Checkbox = ({ label }) => {
                 width: "100%",
             }}
         >
-            <Checkbox_ inputId={label} name={label} value={label} onChange={handleChange} checked={check} />
-            <div ref={setCombinedRef} style={{ position: "relative", flex: 1, display: 'flex', alignItems: 'center' }}>
-                {!showTimeline && containerWidth > 0 && checkboxGroup?.guidance &&
-                    <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-                        <Bars
-                            guidance={checkboxGroup.guidance}
-                            orientationScheme={interpolateOranges}
-                            barKeys={[label]}
-                            encodings={{
-                                orientation: "horizontal",
-                                positionDomain: "interactions",
-                                colorDomain: "index",
-                            }}
-                            width={containerWidth}
-                            height={24}
-                            layout="checkbox"
-                        />
-                    </div>
-                }
-                
-                {/* Render Timeline In-Situ (Background Layer) */}
-                {showTimeline && timelineData && (
-                    <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-                        <TimelineVis
-                            records={timelineData.records}
-                            maxIndex={timelineData.maxIndex}
-                            leftInsetPx={axisOffsetPx}
-                            tooltipId={tooltipId}
-                            widgetId={checkboxGroup?.tooltipLabel ?? checkboxGroup?.id}
-                            value={label}
-                            kind="multi-selection"
-                        />
-                    </div>
-                )}
-
-                <label htmlFor={label} className="ml-2" style={{
+            <Checkbox_
+                {...primeProps}
+                inputId={resolvedInputId}
+                name={name ?? checkboxGroup?.id ?? label}
+                value={value}
+                disabled={disabled}
+                tabIndex={tabIndex ?? tabindex}
+                ariaLabel={ariaLabel}
+                ariaLabelledBy={ariaLabelledBy}
+                className={className ?? styleClass}
+                style={style}
+                onChange={handleChange}
+                checked={checked}
+            />
+            <div
+                ref={containerRef}
+                style={{
                     position: "relative",
-                    zIndex: 1, // Ensure text is on top
-                    display: "block",
-                    padding: "2px 8px",
-                    color: '#000000', // Force black color
-                    minWidth: '60px' // Ensure label has some width
-                }}>{label}</label>
+                    flex: 1,
+                    minWidth: 0,
+                    minHeight: "24px",
+                    display: "flex",
+                    alignItems: "center",
+                }}
+            >
+                {visualize &&
+                    hasProvenance &&
+                    !showTimeline &&
+                    containerWidth > 0 && (
+                        <div
+                            aria-hidden="true"
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                zIndex: 0,
+                            }}
+                        >
+                            <Bars
+                                guidance={guidance}
+                                orientationScheme={
+                                    interpolateOranges
+                                }
+                                barKeys={[value]}
+                                encodings={{
+                                    orientation: "horizontal",
+                                    positionDomain: "interactions",
+                                    colorDomain:
+                                        provenanceMode === "time"
+                                            ? "interactionTime"
+                                            : "interactionIndex",
+                                }}
+                                width={containerWidth}
+                                height={24}
+                                layout="checkbox"
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                }}
+                            />
+                        </div>
+                    )}
+
+                {visualize &&
+                    showTimeline &&
+                    timelineData && (
+                        <div
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                zIndex: 0,
+                                display: "flex",
+                                alignItems: "center",
+                            }}
+                        >
+                            <TimelineVis
+                                records={timelineData.records}
+                                maxIndex={timelineData.maxIndex}
+                                mode={provenanceMode}
+                                timeDomain={checkboxGroup?.timeDomain}
+                                brushRange={checkboxGroup?.brushRange}
+                                tooltipId={tooltip}
+                                widgetId={
+                                    checkboxGroup?.tooltipLabel ??
+                                    checkboxGroup?.id
+                                }
+                                value={value}
+                                kind="multi-selection"
+                                onRestore={(
+                                    _value,
+                                    _record,
+                                    _event,
+                                    context
+                                ) =>
+                                    checkboxGroup
+                                        ?.restoreTemporalAtContext(context)
+                                }
+                            />
+                        </div>
+                    )}
+
+                <label
+                    htmlFor={resolvedInputId}
+                    className={labelStyleClass}
+                    style={{
+                        position: "relative",
+                        zIndex: 1,
+                        display: "block",
+                        minWidth: "60px",
+                        padding: "2px 8px",
+                        cursor: disabled
+                            ? "not-allowed"
+                            : "pointer",
+                        ...labelStyle,
+                    }}
+                >
+                    <DropdownBarLabel
+                        value={value}
+                        guidance={guidance}
+                        orientationScheme={interpolateOranges}
+                        containerWidth={containerWidth}
+                        showTimeline={showTimeline}
+                        positionDomain="interactions"
+                        colorDomain={
+                            provenanceMode === "time"
+                                ? "interactionTime"
+                                : "interactionIndex"
+                        }
+                    >
+                        {visibleLabel}
+                    </DropdownBarLabel>
+                </label>
             </div>
         </div>
-    )
-}
+    );
+};
 
-export default Checkbox
+export default Checkbox;

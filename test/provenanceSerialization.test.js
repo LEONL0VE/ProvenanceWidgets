@@ -87,6 +87,30 @@ test("keeps one-record interacted V1 Multi Select history as interaction", () =>
     assert.equal(result.data[0].kind, "interaction");
 });
 
+test("normalizes PW 1.0 Checkbox Group selection arrays", () => {
+    const result = normalizeSerializedProvenance({
+        selections: [
+            {
+                value: ["Chicken"],
+                timestamp: "2026-07-30T01:02:03.000Z",
+            },
+            {
+                value: ["Chicken", "Beef"],
+                timestamp: "2026-07-30T01:02:04.000Z",
+            },
+        ],
+    }, {
+        ...options,
+        widgetId: "protein-filter",
+        widgetType: "checkbox-group",
+    });
+
+    assert.deepEqual(
+        result.data.map(record => record.value),
+        [["Chicken"], ["Chicken", "Beef"]]
+    );
+});
+
 test("rejects invalid V1 Multi Select values", () => {
     assert.throws(
         () => normalizeSerializedProvenance({

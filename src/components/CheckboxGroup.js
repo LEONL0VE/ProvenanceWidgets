@@ -1,122 +1,662 @@
-import { useEffect, useState, createContext, useContext, useRef, useCallback } from 'react';
-import SelectionProvenance from '../strategies/provenance/SelectionProvenance.ts';
-import { UNILATERAL_GUIDANCE_EVENT_NAME } from '../constants.ts';
-import useProvenance from './hooks/useProvenance.js';
-import useRevertedValue from './hooks/useRevertedValue.js';
+import {
+    Children,
+    isValidElement,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
+import { Slider as Slider_ } from "primereact/slider/slider.esm.js";
+import SelectionProvenance from "../strategies/provenance/SelectionProvenance.ts";
+import { UNILATERAL_GUIDANCE_EVENT_NAME } from "../constants.ts";
+import useProvenanceController from "./hooks/useProvenanceController.js";
+import useRevertedValue from "./hooks/useRevertedValue.js";
+import useWidgetRegistry from "./hooks/useWidgetRegistry.js";
+import Checkbox from "./Checkbox.js";
+import CheckboxGroupContext, {
+    useCheckboxGroup,
+} from "./checkboxGroupContext.js";
+import {
+    callCheckboxGroupCallbacks,
+    checkboxGroupValueKey,
+    getCheckboxGroupCaller,
+    getCheckboxKeysAtTimelinePoint,
+    getCheckboxOptionLabel,
+    getCheckboxOptionValue,
+    getControlledCheckboxGroupValue,
+    getInitialCheckboxGroupValue,
+    isResolvableCheckboxGroupValue,
+    resolveCheckboxGroupValue,
+    restoreCheckboxGroupTemporalValue,
+} from "./checkboxGroupValue.js";
+import {
+    getSelectionTimeDomain,
+    normalizeSelectionBrushRange,
+} from "./selectionTimeline.js";
 
-// Create context for checkbox group
-const CheckboxGroupContext = createContext(null);
+export { useCheckboxGroup };
 
-// Export hook to use the context
-export const useCheckboxGroup = () => {
-    return useContext(CheckboxGroupContext);
-};
+const getChildValues = children =>
+    Children.toArray(children)
+        .filter(isValidElement)
+        .map(child => child.props.value ?? child.props.label)
+        .filter(value => value !== undefined);
 
+const getCheckedChildValues = children =>
+    Children.toArray(children)
+        .filter(isValidElement)
+        .filter(child =>
+            child.props.checked === true ||
+            child.props.defaultChecked === true
+        )
+        .map(child => child.props.value ?? child.props.label)
+        .filter(value => value !== undefined);
+
+const optionHasField = (options, field) =>
+    typeof field === "string" &&
+    options.some(option =>
+        option !== null &&
+        typeof option === "object" &&
+        Object.prototype.hasOwnProperty.call(option, field)
+    );
+
+/**
+ * Checkbox Group with the PW 1.0 public provenance contract.
+ *
+ * Every interaction records the complete selected key array. This is
+ * required for simultaneous changes, imported provenance, and restoring all
+ * options active at a clicked Temporal position.
+ */
 const CheckboxGroup = (props) => {
-    const [registeredComponents, setRegisteredComponents] = useProvenance()
-    const selectionProvenanceRef = useRef(null);
-    const previousSelectedValuesRef = useRef(null);
-    const [revertedValue] = useRevertedValue(props.id);
-    const isInitialMount = useRef(true);
+    const {
+        id,
+        data,
+        options,
+        children,
+        name,
+        dataLabel,
+        "data-label": legacyDataLabel,
+        temporalBrush: temporalBrushProp,
+        enableTemporalBrush,
+        checkboxProps = {},
+        style,
+        className,
+        styleClass,
+        ...groupProps
+    } = props;
+    const optionData = data ?? options ?? [];
+    const usesData =
+        Array.isArray(optionData) && optionData.length > 0;
+    const childValues = useMemo(
+        () => getChildValues(children),
+        [children]
+    );
+    const checkedChildValues = useMemo(
+        () => getCheckedChildValues(children),
+        [children]
+    );
+    const availableOptions = usesData
+        ? optionData
+        : childValues;
+    const tooltipLabel = dataLabel ?? legacyDataLabel ?? id;
+    const visualize = props.visualize ?? true;
+    const temporalBrush =
+        temporalBrushProp ?? enableTemporalBrush ?? false;
+    const legacyValueField =
+        usesData &&
+        !props.optionValue &&
+        !props.valueField &&
+        optionHasField(optionData, props.value)
+            ? props.value
+            : undefined;
+    const legacyLabelField =
+        usesData &&
+        !props.optionLabel &&
+        optionHasField(optionData, props.label)
+            ? props.label
+            : undefined;
+    const config = useMemo(
+        () => ({
+            dataKey: props.dataKey,
+            optionLabel:
+                props.optionLabel ?? legacyLabelField,
+            optionValue:
+                props.optionValue ??
+                props.valueField ??
+                legacyValueField,
+        }),
+        [
+            props.dataKey,
+            props.optionLabel,
+            props.optionValue,
+            props.valueField,
+            legacyLabelField,
+            legacyValueField,
+        ]
+    );
+    const contractProps = legacyValueField
+        ? { ...props, value: undefined }
+        : props;
+    const initialValueRef = useRef(
+        getInitialCheckboxGroupValue(
+            contractProps,
+            availableOptions,
+            config,
+            checkedChildValues
+        )
+    );
+    const [revertedValue] = useRevertedValue(id);
+    const {
+        registerWidget,
+        notifyWidget,
+        restoreWidgetValue,
+    } = useWidgetRegistry();
+    const [showTimeline, setShowTimeline] = useState(false);
+    const [brushRange, setBrushRange] = useState([0, 100]);
+    const elementRef = useRef(null);
+    const propsRef = useRef(props);
+    const availableOptionsRef = useRef(availableOptions);
+    const configRef = useRef(config);
+    const checkboxRegistrationsRef = useRef(new Map());
+    propsRef.current = props;
+    availableOptionsRef.current = availableOptions;
+    configRef.current = config;
+
+    const strategyFactory = useMemo(
+        () => () => {
+            const strategy = new SelectionProvenance();
+            strategy.tooltipLabel = tooltipLabel;
+            strategy.tooltipIndexOffset = 1;
+            return strategy;
+        },
+        [tooltipLabel]
+    );
+
+    const {
+        currentValue,
+        strategy,
+        hasProvenance,
+        provenance: serializedProvenance,
+        mode: provenanceMode,
+        recordInteraction,
+        recordExternalChange,
+        restoreValue,
+    } = useProvenanceController({
+        id,
+        widgetType: "checkbox-group",
+        value: initialValueRef.current,
+        provenance: props.provenance,
+        mode: props.mode,
+        sampleIntervalMs: props.sampleIntervalMs,
+        freeze: props.freeze,
+        visualize,
+        onProvenanceChange:
+            props.onProvenanceChange ?? props.provenanceChange,
+        strategyFactory,
+    });
+    const [selection, setSelection] = useState(
+        () => Array.isArray(currentValue) ? currentValue : []
+    );
+    const currentValueRef = useRef(currentValue);
+    const selectionRef = useRef(selection);
+    const serializedProvenanceRef = useRef(serializedProvenance);
+    currentValueRef.current = currentValue;
+    selectionRef.current = selection;
+    serializedProvenanceRef.current = serializedProvenance;
+    const currentValueKey = checkboxGroupValueKey(currentValue);
+    const historyVersion = serializedProvenance.data
+        .map(record => record.timestamp)
+        .join("|");
+    const timeDomain = useMemo(
+        () => getSelectionTimeDomain(serializedProvenance.data),
+        [historyVersion]
+    );
 
     useEffect(() => {
-        if (revertedValue !== undefined && Array.isArray(revertedValue)) {
-            // Update the internal state ref if needed, but the important part is 
-            // telling the children to update and logging the interaction.
-            if (selectionProvenanceRef.current) {
-                selectionProvenanceRef.current.insert(revertedValue);
-                previousSelectedValuesRef.current = revertedValue;
+        const restored = resolveCheckboxGroupValue(
+            availableOptions,
+            currentValue,
+            config
+        );
+        selectionRef.current = restored;
+        setSelection(restored);
+    }, [
+        currentValueKey,
+        availableOptions,
+        config,
+    ]);
 
-                // Synchronize internal checkbox states
-                revertedValue.forEach(label => checkboxStatesRef.current.set(label, true));
-                // Clear those not in revertedValue
-                Array.from(checkboxStatesRef.current.keys()).forEach(label => {
-                    if (!revertedValue.includes(label)) checkboxStatesRef.current.set(label, false);
+    const controlledSelection =
+        getControlledCheckboxGroupValue(
+            contractProps,
+            availableOptions,
+            config
+        );
+    const controlledPresent =
+        controlledSelection !== undefined;
+    const controlledValueKey = controlledPresent
+        ? checkboxGroupValueKey(controlledSelection)
+        : "__uncontrolled__";
+    const previousControlledKeyRef =
+        useRef(controlledValueKey);
+    const previousProvenanceRef = useRef(props.provenance);
+    const emittedValueKeyRef = useRef(null);
+
+    useEffect(() => {
+        const provenanceChanged =
+            props.provenance !== previousProvenanceRef.current;
+        const controlledChanged =
+            controlledValueKey !==
+            previousControlledKeyRef.current;
+
+        if (controlledPresent && controlledChanged) {
+            selectionRef.current = controlledSelection;
+            setSelection(controlledSelection);
+            if (
+                emittedValueKeyRef.current === controlledValueKey ||
+                provenanceChanged
+            ) {
+                emittedValueKeyRef.current = null;
+            } else {
+                recordExternalChange(controlledSelection, {
+                    caller: getCheckboxGroupCaller(
+                        currentValueRef.current,
+                        controlledSelection
+                    ),
                 });
             }
         }
-    }, [revertedValue]);
+        previousControlledKeyRef.current = controlledValueKey;
+        previousProvenanceRef.current = props.provenance;
+    }, [
+        controlledPresent,
+        controlledSelection,
+        controlledValueKey,
+        props.provenance,
+        recordExternalChange,
+    ]);
+
+    const applyRegisteredValue = useCallback(
+        (nextValue, source = "history") => {
+            if (
+                !isResolvableCheckboxGroupValue(
+                    nextValue,
+                    availableOptionsRef.current,
+                    configRef.current
+                )
+            ) {
+                return false;
+            }
+            const restored = resolveCheckboxGroupValue(
+                availableOptionsRef.current,
+                nextValue,
+                configRef.current
+            );
+            const changed = restoreValue(restored, {
+                caller: getCheckboxGroupCaller(
+                    currentValueRef.current,
+                    restored
+                ),
+            });
+            emittedValueKeyRef.current =
+                checkboxGroupValueKey(restored);
+            selectionRef.current = restored;
+            setSelection(restored);
+            callCheckboxGroupCallbacks(
+                propsRef.current,
+                restored,
+                { source }
+            );
+            return changed;
+        },
+        [restoreValue]
+    );
+
+    const setCheckboxValue = useCallback(
+        (value, checked, event) => {
+            const nextCandidate = checked
+                ? [...selectionRef.current, value]
+                : selectionRef.current.filter(
+                    selected =>
+                        !Object.is(selected, value) &&
+                        String(selected) !== String(value)
+                );
+            const nextValue = resolveCheckboxGroupValue(
+                availableOptionsRef.current,
+                nextCandidate,
+                configRef.current
+            );
+            if (
+                checkboxGroupValueKey(nextValue) ===
+                checkboxGroupValueKey(selectionRef.current)
+            ) {
+                return false;
+            }
+            emittedValueKeyRef.current =
+                checkboxGroupValueKey(nextValue);
+            recordInteraction(nextValue, {
+                caller: value,
+            });
+            selectionRef.current = nextValue;
+            setSelection(nextValue);
+            callCheckboxGroupCallbacks(
+                propsRef.current,
+                nextValue,
+                event
+            );
+            return true;
+        },
+        [recordInteraction]
+    );
+
+    const registerCheckbox = useCallback((registration) => {
+        const key = registration.value;
+        checkboxRegistrationsRef.current.set(key, registration);
+        return () => {
+            if (
+                checkboxRegistrationsRef.current.get(key) ===
+                registration
+            ) {
+                checkboxRegistrationsRef.current.delete(key);
+            }
+        };
+    }, []);
 
     useEffect(() => {
-        const selectionProvenance = new SelectionProvenance();
-        selectionProvenance.tooltipLabel = props['data-label'] || props.id;
-        selectionProvenanceRef.current = selectionProvenance;
+        if (!strategy) return undefined;
+        strategy.hasUserInteracted = hasProvenance;
+        strategy.tooltipLabel = tooltipLabel;
+        strategy.tooltipIndexOffset = 1;
+        notifyWidget(id);
+        return undefined;
+    }, [
+        strategy,
+        hasProvenance,
+        tooltipLabel,
+        id,
+        notifyWidget,
+    ]);
 
-        setRegisteredComponents(prev => {
-            const newMap = prev instanceof Map ? new Map(prev) : new Map()
-            newMap.set(props.id, selectionProvenance)
-            return newMap
-        })
+    useEffect(() => {
+        if (!strategy) return undefined;
+        const registration = {
+            id,
+            type: "checkbox-group",
+            provenance: strategy,
+            getProvenance: () => serializedProvenanceRef.current,
+            elementRef,
+            getValue: () => selectionRef.current,
+            setValue: applyRegisteredValue,
+            visualize,
+            mode: provenanceMode,
+            rendersOwnTemporalHeader: true,
+            focus: () => {
+                elementRef.current?.scrollIntoView?.({
+                    behavior: "smooth",
+                    block: "center",
+                });
+                elementRef.current
+                    ?.querySelector?.('input[type="checkbox"]')
+                    ?.focus?.();
+            },
+        };
+        const unregister = registerWidget(registration);
+        const refreshRegistry = () => notifyWidget(id);
+        strategy.addEventListener(
+            UNILATERAL_GUIDANCE_EVENT_NAME,
+            refreshRegistry
+        );
+        return () => {
+            strategy.removeEventListener(
+                UNILATERAL_GUIDANCE_EVENT_NAME,
+                refreshRegistry
+            );
+            unregister();
+        };
+    }, [
+        strategy,
+        id,
+        applyRegisteredValue,
+        registerWidget,
+        notifyWidget,
+        visualize,
+        provenanceMode,
+    ]);
 
-        selectionProvenance.addEventListener(UNILATERAL_GUIDANCE_EVENT_NAME, v => {
-            console.log(v.detail)
-            // Bump reference so consumers re-render and can read updated provenance
-            setRegisteredComponents(prev => {
-                if (prev instanceof Map) {
-                    return new Map(prev)
-                }
-                // Fallback: create new Map if prev is not a Map
-                return new Map()
-            })
-        })
-    }, [])
+    useEffect(() => {
+        const handleToggle = event => {
+            if (event.detail?.target !== id) return;
+            setShowTimeline(Boolean(event.detail.open));
+        };
+        window.addEventListener(
+            "provenance-timeline-toggle",
+            handleToggle
+        );
+        return () => window.removeEventListener(
+            "provenance-timeline-toggle",
+            handleToggle
+        );
+    }, [id]);
 
-    // Use ref to track checkbox states to avoid unnecessary re-renders
-    const checkboxStatesRef = useRef(new Map());
+    useEffect(() => {
+        if (revertedValue === undefined) return;
+        applyRegisteredValue(revertedValue, "history");
+    }, [revertedValue, applyRegisteredValue]);
 
-    const registerCheckbox = useCallback((label) => {
-        if (!checkboxStatesRef.current.has(label)) {
-            checkboxStatesRef.current.set(label, false);
-        }
-    }, []);
+    const restoreTemporalAtContext = useCallback(
+        context => {
+            const keys = getCheckboxKeysAtTimelinePoint({
+                guidance: strategy,
+                point:
+                    provenanceMode === "interaction" &&
+                    context?.point !== undefined
+                        ? Number(context.point) + 1
+                        : context?.point,
+                mode: provenanceMode,
+            });
+            return restoreCheckboxGroupTemporalValue({
+                restoreWidgetValue,
+                target: id,
+                value: keys,
+            });
+        },
+        [
+            strategy,
+            provenanceMode,
+            restoreWidgetValue,
+            id,
+        ]
+    );
 
-    const updateCheckboxState = useCallback((label, checked) => {
-        const currentState = checkboxStatesRef.current.get(label);
-        // Only update if the value actually changed
-        if (currentState !== checked) {
-            checkboxStatesRef.current.set(label, checked);
+    const handleBrushChange = event => {
+        setBrushRange(normalizeSelectionBrushRange(event.value));
+    };
 
-            // Trigger insert only if selectionProvenance is ready
-            if (selectionProvenanceRef.current) {
-                // Collect all currently checked checkbox values
-                const selectedValues = Array.from(checkboxStatesRef.current.entries())
-                    .filter(([l, c]) => c)
-                    .map(([l]) => l)
-                    .sort();
-
-                // Only insert if the selected values actually changed
-                // Skip if this is the initial empty state (no previous values and current is empty)
-                const previousValues = previousSelectedValuesRef.current;
-                const isInitialEmptyState = !previousValues && selectedValues.length === 0;
-
-                if (!isInitialEmptyState) {
-                    const valuesChanged = !previousValues ||
-                        previousValues.length !== selectedValues.length ||
-                        !previousValues.every((val, idx) => val === selectedValues[idx]);
-
-                    if (valuesChanged) {
-                        previousSelectedValuesRef.current = selectedValues;
-                        selectionProvenanceRef.current.insert(selectedValues, { caller: label });
-                    }
-                } else {
-                    // Set the initial state reference
-                    previousSelectedValuesRef.current = selectedValues;
-                }
+    const handleBrushEnd = event => {
+        const range = normalizeSelectionBrushRange(
+            event.value ?? brushRange
+        );
+        setBrushRange(range);
+        window.dispatchEvent(new CustomEvent(
+            "provenance-widgets",
+            {
+                detail: {
+                    id,
+                    widget: "checkbox-group",
+                    mode: provenanceMode,
+                    interaction: "brush-end",
+                    data: { selection: range },
+                },
             }
-        }
-    }, []);
+        ));
+    };
+
+    const renderedChildren = usesData
+        ? optionData.map((option, index) => {
+            const value = getCheckboxOptionValue(option, config);
+            const label = getCheckboxOptionLabel(option, config);
+            const optionProps =
+                option && typeof option === "object"
+                    ? option
+                    : {};
+            const legacyName =
+                typeof props.name === "string"
+                    ? optionProps[props.name]
+                    : undefined;
+            const legacyInputId =
+                typeof props.inputId === "string"
+                    ? optionProps[props.inputId]
+                    : undefined;
+            return (
+                <Checkbox
+                    key={String(value ?? index)}
+                    {...checkboxProps}
+                    {...optionProps}
+                    value={value}
+                    displayLabel={label}
+                    name={
+                        legacyName ??
+                        optionProps.name ??
+                        name ??
+                        id
+                    }
+                    inputId={
+                        legacyInputId ??
+                        optionProps.inputId ??
+                        `${id}-${String(value ?? index)}`
+                    }
+                    tabIndex={
+                        optionProps.tabIndex ??
+                        optionProps.tabindex ??
+                        props.tabIndex ??
+                        props.tabindex
+                    }
+                    ariaLabel={
+                        optionProps.ariaLabel ??
+                        props.ariaLabel
+                    }
+                    ariaLabelledBy={
+                        optionProps.ariaLabelledBy ??
+                        props.ariaLabelledBy
+                    }
+                    disabled={
+                        optionProps.disabled ??
+                        props.disabled
+                    }
+                    labelStyleClass={
+                        optionProps.labelStyleClass ??
+                        props.labelStyleClass
+                    }
+                />
+            );
+        })
+        : children;
+
+    const contextValue = useMemo(
+        () => ({
+            id,
+            selected: selection,
+            setCheckboxValue,
+            registerCheckbox,
+            guidance: strategy,
+            hasProvenance,
+            visualize,
+            mode: provenanceMode,
+            showTimeline,
+            timeDomain,
+            brushRange,
+            tooltipLabel,
+            restoreTemporalAtContext,
+        }),
+        [
+            id,
+            selection,
+            setCheckboxValue,
+            registerCheckbox,
+            strategy,
+            hasProvenance,
+            visualize,
+            provenanceMode,
+            showTimeline,
+            timeDomain,
+            brushRange,
+            tooltipLabel,
+            restoreTemporalAtContext,
+        ]
+    );
 
     return (
-        <CheckboxGroupContext.Provider value={{
-            registerCheckbox,
-            updateCheckboxState,
-            guidance: selectionProvenanceRef.current,
-            id: props.id,
-            tooltipLabel: props['data-label'] || props.id,
-        }}>
-            {props.children}
+        <CheckboxGroupContext.Provider value={contextValue}>
+            <div
+                ref={elementRef}
+                id={id}
+                role="group"
+                aria-label={
+                    groupProps["aria-label"] ?? tooltipLabel
+                }
+                data-provenance-widget="checkbox-group"
+                data-provenance-open={
+                    showTimeline ? "true" : undefined
+                }
+                className={className ?? styleClass}
+                style={style}
+            >
+                {visualize && hasProvenance && showTimeline && (
+                    <div
+                        data-timeline-axis={id}
+                        data-provenance-chart-target={id}
+                        style={{
+                            marginLeft: "32px",
+                            marginBottom: "4px",
+                        }}
+                    >
+                        {temporalBrush && (
+                            <div
+                                data-provenance-temporal-brush={id}
+                                title={
+                                    "Drag both handles to zoom the " +
+                                    "visible provenance range"
+                                }
+                            >
+                                <Slider_
+                                    range
+                                    min={0}
+                                    max={100}
+                                    value={brushRange}
+                                    onChange={handleBrushChange}
+                                    onSlideEnd={handleBrushEnd}
+                                    aria-label={
+                                        `${tooltipLabel} temporal range`
+                                    }
+                                    style={{ marginBottom: "7px" }}
+                                />
+                            </div>
+                        )}
+                        <div
+                            style={{
+                                borderTop: "2px solid #4b5563",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                fontSize: "12px",
+                                fontWeight: 600,
+                                color: "#4b5563",
+                                paddingTop: "2px",
+                            }}
+                        >
+                            <span>
+                                {provenanceMode === "time"
+                                    ? "t=0"
+                                    : "n=0"}
+                            </span>
+                            <span>now</span>
+                        </div>
+                    </div>
+                )}
+                {renderedChildren}
+            </div>
         </CheckboxGroupContext.Provider>
-    )
-}
+    );
+};
 
-export default CheckboxGroup
+export default CheckboxGroup;

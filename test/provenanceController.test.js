@@ -365,6 +365,37 @@ test("records complete Multi Select sets as simultaneous interactions", () => {
     );
 });
 
+test("records and restores complete Checkbox Group sets", () => {
+    const strategy = createStrategy();
+    const controller = new ProvenanceController({
+        id: "protein-filter",
+        widgetType: "checkbox-group",
+        value: [],
+        strategy,
+    });
+
+    assert.equal(controller.recordInteraction(["Chicken"], {
+        caller: "Chicken",
+    }), true);
+    assert.equal(controller.recordInteraction(
+        ["Chicken", "Beef"],
+        { caller: "Beef" }
+    ), true);
+    assert.equal(controller.restoreValue(["Beef"], {
+        caller: "Chicken",
+    }), true);
+
+    assert.deepEqual(
+        controller.exportProvenance().data.map(record => record.value),
+        [
+            [],
+            ["Chicken"],
+            ["Chicken", "Beef"],
+            ["Beef"],
+        ]
+    );
+});
+
 test("can pause and restart time sampling for React lifecycle replay", () => {
     let intervalCount = 0;
     let clearCount = 0;
