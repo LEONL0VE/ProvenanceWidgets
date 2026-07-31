@@ -308,6 +308,33 @@ test("records scalar dropdown keys, clearing, and history restore", () => {
     assert.deepEqual(sources, ["user", "user", "history"]);
 });
 
+test("records Radio Group as one scalar PW selection", () => {
+    const strategy = createStrategy();
+    const controller = new ProvenanceController({
+        id: "pizza-topping-filter",
+        widgetType: "radio-group",
+        value: "Cheese",
+        strategy,
+    });
+
+    assert.equal(controller.getSnapshot().hasProvenance, false);
+    assert.equal(controller.recordInteraction("Mushroom", {
+        caller: "Mushroom",
+    }), true);
+    assert.equal(controller.restoreValue("Cheese", {
+        caller: "Cheese",
+    }), true);
+
+    assert.deepEqual(
+        controller.exportProvenance().data.map(record => record.value),
+        ["Cheese", "Mushroom", "Cheese"]
+    );
+    assert.deepEqual(
+        controller.exportProvenance().data.map(record => record.kind),
+        ["baseline", "interaction", "interaction"]
+    );
+});
+
 test("records complete Multi Select sets as simultaneous interactions", () => {
     const strategy = createStrategy();
     const controller = new ProvenanceController({

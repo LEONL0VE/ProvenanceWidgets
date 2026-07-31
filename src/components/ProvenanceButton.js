@@ -236,7 +236,9 @@ const ProvenanceButton = ({ target }) => {
                 </div>
                 
                 {/* For selection groups, render HEADER beside the button when open */}
-                {isSelectionGroup && open && (
+                {isSelectionGroup &&
+                    open &&
+                    !registration?.rendersOwnTemporalHeader && (
                      <div style={{ flexGrow: 1, marginLeft: '10px' }}>
                          <Chart target={target} part="header" />
                      </div>

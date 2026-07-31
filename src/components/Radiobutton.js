@@ -1,150 +1,166 @@
-import { RadioButton as Radiobutton_ } from 'primereact/radiobutton/radiobutton.esm.js';
-import { useEffect, useState, useMemo, useRef } from 'react';
-import { useRadioGroup } from './RadioGroup.js';
-import Bars from 'scents';
-import { interpolateOranges } from 'd3';
-import { getBarLabelColor } from './utils.js';
-import useElementSize from './hooks/useElementSize.js';
-import useRevertedValue from './hooks/useRevertedValue.js';
-import useProvenanceTooltip from './hooks/useProvenanceTooltip.js';
-import TimelineVis from './TimelineVis.js';
+import { RadioButton as RadioButton_ } from "primereact/radiobutton/radiobutton.esm.js";
+import { useEffect, useMemo } from "react";
+import { interpolateOranges } from "d3";
+import Bars from "scents";
+import { useRadioGroup } from "./radioGroupContext.js";
+import useElementSize from "./hooks/useElementSize.js";
+import useProvenanceTooltip from "./hooks/useProvenanceTooltip.js";
+import TimelineVis from "./TimelineVis.js";
+import DropdownBarLabel from "./DropdownBarLabel.js";
 import {
     formatAggregateTooltip,
-    getTemporalRowTooltipProps,
     getAggregateTooltipRecord,
     getTooltipAnchorProps,
-} from './provenanceTooltip.js';
+} from "./provenanceTooltip.js";
 
-const Radiobutton = ({ label, value, stateItem, setStateItem }) => {
-    const [check, setCheck] = useState()
+/**
+ * One option in a RadioGroup.
+ *
+ * `label` remains the legacy group/name prop used by the existing Showcase;
+ * PW 1.0's visible data label is supplied as `displayLabel`.
+ */
+const Radiobutton = ({
+    label,
+    displayLabel,
+    value,
+    stateItem,
+    setStateItem,
+    inputId,
+    name,
+    disabled,
+    tabindex,
+    tabIndex,
+    ariaLabel,
+    ariaLabelledBy,
+    onChange,
+    selectedChange,
+    className,
+    styleClass,
+    style,
+    labelStyle,
+    labelStyleClass,
+    ...primeProps
+}) => {
     const radioGroup = useRadioGroup();
-    const [revertedValue] = useRevertedValue(radioGroup?.id);
-    const [containerRef, { width: containerWidth }] = useElementSize();
-    const tooltipId = useProvenanceTooltip();
-    const [showTimeline, setShowTimeline] = useState(false);
-    const [axisOffsetPx, setAxisOffsetPx] = useState(0);
-    const containerElRef = useRef(null);
-    const timelineVersion = radioGroup?.guidance?.domain?.get?.("index")?.[1] ?? 0;
-    const setCombinedRef = (node) => {
-        containerElRef.current = node;
-        containerRef(node);
-    };
+    const [containerRef, { width: containerWidth }] =
+        useElementSize();
+    const tooltip = useProvenanceTooltip();
+    const guidance = radioGroup?.guidance;
+    const hasProvenance =
+        radioGroup?.hasProvenance ?? false;
+    const visualize = radioGroup?.visualize ?? true;
+    const showTimeline =
+        radioGroup?.showTimeline ?? false;
+    const provenanceMode =
+        radioGroup?.mode ?? "interaction";
+    const timelineVersion =
+        guidance?.domain?.get?.("index")?.[1] ?? 0;
+    const timeVersion =
+        guidance?.domain?.get?.("time")?.[2] ?? 0;
+    const visibleLabel =
+        displayLabel ?? value ?? label ?? "";
+    const resolvedInputId =
+        inputId ??
+        `${radioGroup?.id ?? "radio"}-${String(value)}`;
+    const checked = radioGroup
+        ? Object.is(radioGroup.selected, value) ||
+            (
+                radioGroup.selected !== null &&
+                value !== null &&
+                String(radioGroup.selected) === String(value)
+            )
+        : stateItem === value;
 
     useEffect(() => {
-        const handleToggle = (e) => {
-            if (e.detail && e.detail.target === radioGroup?.id) {
-                setShowTimeline(e.detail.open);
-            }
-        };
-        window.addEventListener('provenance-timeline-toggle', handleToggle);
-        return () => window.removeEventListener('provenance-timeline-toggle', handleToggle);
-    }, [radioGroup?.id]);
-
-    useEffect(() => {
-        if (!showTimeline || !radioGroup?.id) return;
-
-        const compute = () => {
-            const axisEl = document.querySelector(`[data-timeline-axis="${radioGroup.id}"]`);
-            const rowEl = containerElRef.current;
-            if (!axisEl || !rowEl) return;
-
-            const axisLeft = axisEl.getBoundingClientRect().left;
-            const rowLeft = rowEl.getBoundingClientRect().left;
-            const nextOffset = Math.max(0, Math.round(axisLeft - rowLeft));
-            setAxisOffsetPx(nextOffset);
-        };
-
-        const raf = requestAnimationFrame(compute);
-        window.addEventListener('resize', compute);
-        return () => {
-            cancelAnimationFrame(raf);
-            window.removeEventListener('resize', compute);
-        };
-    }, [showTimeline, radioGroup?.id]);
-
-    // Register this radio button with the group when it mounts
-    useEffect(() => {
-        if (radioGroup && radioGroup.registerRadio) {
-            radioGroup.registerRadio(value);
-        }
-    }, [value, radioGroup]);
+        if (!radioGroup?.registerRadio) return undefined;
+        return radioGroup.registerRadio({
+            value,
+            setStateItem,
+        });
+    }, [
+        radioGroup?.registerRadio,
+        value,
+        setStateItem,
+    ]);
 
     const timelineData = useMemo(() => {
-        if (!showTimeline || !radioGroup?.guidance?.detailedData) return null;
-        
-        const detailedData = radioGroup.guidance.detailedData;
-        // detailedData is Map<value, records>
-        const records = detailedData.get(value);
+        if (
+            !showTimeline ||
+            !hasProvenance ||
+            !guidance?.detailedData
+        ) {
+            return null;
+        }
+        const records = guidance.detailedData.get(value);
         if (!records) return null;
 
-        // Calculate max index for the entire group
         let maxIndex = 0;
-        const allRecords = Array.from(detailedData.values()).flat();
-        for (const record of allRecords) {
-            if (record.select?.index > maxIndex) maxIndex = record.select.index;
-            if (record.unselect?.index > maxIndex) maxIndex = record.unselect.index;
+        for (const optionRecords of guidance.detailedData.values()) {
+            for (const record of optionRecords) {
+                maxIndex = Math.max(
+                    maxIndex,
+                    record.select?.index ?? 0,
+                    record.unselect?.index ?? 0
+                );
+            }
         }
-        
-        // Also check domain if available
-        const domainMax = radioGroup.guidance.domain?.get ? radioGroup.guidance.domain.get("index")?.[1] : 0;
-        const displayMax = Math.max(maxIndex, domainMax || 0, 1) + 1;
+        const domainMax =
+            guidance.domain?.get?.("index")?.[1] ?? 0;
+        return {
+            records,
+            // PW 1.0 reserves the final interval for the current state.
+            maxIndex: Math.max(maxIndex, domainMax) + 1,
+        };
+    }, [
+        showTimeline,
+        hasProvenance,
+        guidance,
+        value,
+        timelineVersion,
+        timeVersion,
+    ]);
 
-        return { records, maxIndex: displayMax };
-    }, [showTimeline, radioGroup?.guidance, value, timelineVersion]);
-
-    useEffect(() => {
-        if (revertedValue !== undefined) {
-            // Don't call setStateItem here - the parent (index.js) will handle it
-            // This prevents duplicate provenance logging
-            // The RadioGroup already logged the reversion in its useEffect
-        }
-    }, [revertedValue, value, setStateItem]);
-
-    const handleChange = (e) => {
-        const newValue = e.value;
-        setStateItem(newValue);
-        // Update the radio state in the group with the selected value
-        if (radioGroup && radioGroup.updateRadioState) {
-            radioGroup.updateRadioState(newValue);
-        }
-    }
-
-    const rowTooltipProps = !showTimeline
-        ? getTooltipAnchorProps(
-            tooltipId,
-            formatAggregateTooltip({
-                label: radioGroup?.tooltipLabel ?? radioGroup?.id,
-                value,
-                record: getAggregateTooltipRecord(
-                    radioGroup?.guidance,
+    const aggregateTooltipProps =
+        visualize && hasProvenance && !showTimeline
+            ? getTooltipAnchorProps(
+                tooltip,
+                () => formatAggregateTooltip({
+                    label:
+                        radioGroup?.tooltipLabel ??
+                        radioGroup?.id,
                     value,
-                    'single-selection'
-                ),
-                kind: 'single-selection',
-            }),
-            { focusable: false }
-        )
-        : timelineData
-            ? getTemporalRowTooltipProps(tooltipId, {
-                records: timelineData.records,
-                maxIndex: timelineData.maxIndex,
-                getBounds: () => {
-                    const rect = containerElRef.current?.getBoundingClientRect();
-                    return rect
-                        ? { left: rect.left + axisOffsetPx, right: rect.right }
-                        : null;
-                },
-                label: radioGroup?.tooltipLabel ?? radioGroup?.id,
-                value,
-                kind: 'single-selection',
-            })
+                    record: getAggregateTooltipRecord(
+                        guidance,
+                        value,
+                        "single-selection"
+                    ),
+                    kind: "single-selection",
+                }),
+                { focusable: false }
+            )
             : {};
+
+    const handleChange = event => {
+        if (disabled) return;
+        const nextValue = event.value ?? value;
+        onChange?.(event);
+        selectedChange?.(nextValue, event);
+        if (radioGroup?.selectValue) {
+            radioGroup.selectValue(nextValue, event);
+        } else {
+            setStateItem?.(nextValue);
+        }
+    };
 
     return (
         <div
-            {...rowTooltipProps}
+            {...aggregateTooltipProps}
+            data-provenance-chart-target={radioGroup?.id}
+            data-provenance-option={value}
+            className={className ?? styleClass}
             style={{
-                ...rowTooltipProps.style,
+                ...aggregateTooltipProps.style,
+                ...style,
                 display: "flex",
                 alignItems: "center",
                 gap: "5px",
@@ -152,54 +168,133 @@ const Radiobutton = ({ label, value, stateItem, setStateItem }) => {
                 width: "100%",
             }}
         >
-            <Radiobutton_ inputId={value} name={label} value={value} onChange={handleChange} checked={stateItem === value} />
-            <div ref={setCombinedRef} style={{ position: "relative", flex: 1, display: 'flex', alignItems: 'center' }}>
-                {!showTimeline && containerWidth > 0 && radioGroup?.guidance &&
-                    <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-                        <Bars
-                            guidance={radioGroup.guidance}
-                            orientationScheme={interpolateOranges}
-                            barKeys={[value]}
-                            encodings={{
-                                orientation: "horizontal",
-                                positionDomain: "interactions",
-                                colorDomain: "index",
-                            }}
-                            width={containerWidth}
-                            height={24}
-                            layout="checkbox"
-                        />
-                    </div>
-                }
-                
-                {/* Render Timeline In-Situ (Background Layer) */}
-                {showTimeline && timelineData && (
-                    <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-                        <TimelineVis
-                            records={timelineData.records}
-                            maxIndex={timelineData.maxIndex}
-                            leftInsetPx={axisOffsetPx}
-                            tooltipId={tooltipId}
-                            widgetId={radioGroup?.tooltipLabel ?? radioGroup?.id}
-                            value={value}
-                            kind="single-selection"
-                        />
-                    </div>
-                )}
-
-                <label htmlFor={value} className="ml-2" style={{
+            <RadioButton_
+                {...primeProps}
+                inputId={resolvedInputId}
+                name={name ?? label ?? radioGroup?.id}
+                value={value}
+                disabled={disabled}
+                tabIndex={tabIndex ?? tabindex}
+                ariaLabel={ariaLabel}
+                ariaLabelledBy={ariaLabelledBy}
+                onChange={handleChange}
+                checked={checked}
+            />
+            <div
+                ref={containerRef}
+                style={{
                     position: "relative",
-                    zIndex: 1, // Ensure text is on top
-                    display: "block",
-                    padding: "2px 8px",
-                    color: showTimeline
-                        ? '#000000'
-                        : getBarLabelColor(value, radioGroup?.guidance, interpolateOranges),
-                    minWidth: '60px' // Ensure label has some width
-                }}>{value}</label>
+                    flex: 1,
+                    minWidth: 0,
+                    minHeight: "24px",
+                    display: "flex",
+                    alignItems: "center",
+                }}
+            >
+                {visualize &&
+                    hasProvenance &&
+                    !showTimeline &&
+                    containerWidth > 0 && (
+                        <div
+                            aria-hidden="true"
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                zIndex: 0,
+                            }}
+                        >
+                            <Bars
+                                guidance={guidance}
+                                orientationScheme={
+                                    interpolateOranges
+                                }
+                                barKeys={[value]}
+                                encodings={{
+                                    orientation: "horizontal",
+                                    positionDomain: "selections",
+                                    colorDomain:
+                                        provenanceMode === "time"
+                                            ? "selectionTime"
+                                            : "selectionIndex",
+                                }}
+                                width={containerWidth}
+                                height={24}
+                                layout="checkbox"
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                }}
+                            />
+                        </div>
+                    )}
+
+                {visualize &&
+                    showTimeline &&
+                    timelineData && (
+                        <div
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                zIndex: 0,
+                                display: "flex",
+                                alignItems: "center",
+                            }}
+                        >
+                            <TimelineVis
+                                records={timelineData.records}
+                                maxIndex={timelineData.maxIndex}
+                                mode={provenanceMode}
+                                timeDomain={radioGroup?.timeDomain}
+                                brushRange={radioGroup?.brushRange}
+                                tooltipId={tooltip}
+                                widgetId={
+                                    radioGroup?.tooltipLabel ??
+                                    radioGroup?.id
+                                }
+                                value={value}
+                                kind="single-selection"
+                                onRestore={() =>
+                                    radioGroup
+                                        ?.restoreTemporalValue(value)
+                                }
+                            />
+                        </div>
+                    )}
+
+                <label
+                    htmlFor={resolvedInputId}
+                    className={labelStyleClass}
+                    style={{
+                        position: "relative",
+                        zIndex: 1,
+                        display: "block",
+                        minWidth: "60px",
+                        padding: "2px 8px",
+                        cursor: disabled
+                            ? "not-allowed"
+                            : "pointer",
+                        ...labelStyle,
+                    }}
+                >
+                    <DropdownBarLabel
+                        value={value}
+                        guidance={guidance}
+                        orientationScheme={interpolateOranges}
+                        containerWidth={containerWidth}
+                        showTimeline={showTimeline}
+                        positionDomain="selections"
+                        colorDomain={
+                            provenanceMode === "time"
+                                ? "selectionTime"
+                                : "selectionIndex"
+                        }
+                    >
+                        {visibleLabel}
+                    </DropdownBarLabel>
+                </label>
             </div>
         </div>
-    )
-}
+    );
+};
 
-export default Radiobutton
+export default Radiobutton;

@@ -203,6 +203,30 @@ test("normalizes V1 Single Select Dropdown keys and clearing", () => {
     );
 });
 
+test("normalizes PW 1.0 Radio Group arrays to scalar selections", () => {
+    const restored = normalizeSerializedProvenance({
+        selections: [
+            {
+                value: ["Cheese"],
+                timestamp: "2026-03-01T10:00:00.000Z",
+            },
+            {
+                value: ["Mushroom"],
+                timestamp: "2026-03-01T10:00:01.000Z",
+            },
+        ],
+    }, {
+        ...options,
+        widgetId: "pizza-topping-filter",
+        widgetType: "radio-group",
+    });
+
+    assert.deepEqual(
+        restored.data.map(record => record.value),
+        ["Cheese", "Mushroom"]
+    );
+});
+
 test("keeps a one-record interacted V1 Dropdown as an interaction", () => {
     const restored = normalizeSerializedProvenance({
         selections: [{
