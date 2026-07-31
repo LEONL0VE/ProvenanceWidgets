@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Provenance Widgets Web Components</title>
+    <link
+        rel="stylesheet"
+        href="../../dist/web-components/styles.css"
+    >
+    <style>
+        body {
+            margin: 0;
+            padding: 32px;
+            color: #374151;
+            font-family: Arial, sans-serif;
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: repeat(
+                auto-fit,
+                minmax(320px, 1fr)
+            );
+            gap: 32px;
+        }
+
+        article {
+            min-width: 0;
+        }
+
+        web-provenance-slider {
+            max-width: 420px;
+        }
+
+        #events {
+            overflow: auto;
+            min-height: 80px;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: #f9fafb;
+        }
+    </style>
+</head>
+<body>
+    <h1>Provenance Widgets Web Components</h1>
+    <main>
+        <article>
+            <h2>Single slider</h2>
+            <web-provenance-slider
+                id="vanilla-single-slider"
+                value="45"
+                min="0"
+                max="100"
+                data-label="Price"
+            ></web-provenance-slider>
+        </article>
+
+        <article>
+            <h2>Range slider</h2>
+            <web-provenance-slider
+                id="vanilla-range-slider"
+                value="20"
+                high-value="80"
+                min="0"
+                max="100"
+                data-label="Price range"
+            ></web-provenance-slider>
+        </article>
+
+        <article>
+            <h2>Input text</h2>
+            <web-provenance-inputtext
+                id="vanilla-input"
+                value="initial query"
+                placeholder="Press Enter to commit"
+                data-label="Search"
+            ></web-provenance-inputtext>
+        </article>
+
+        <article>
+            <h2>Single select dropdown</h2>
+            <web-provenance-dropdown
+                id="vanilla-dropdown"
+                data-label="City"
+            ></web-provenance-dropdown>
+        </article>
+
+        <article>
+            <h2>Multi select dropdown</h2>
+            <web-provenance-multiselect
+                id="vanilla-multiselect"
+                data-label="Cities"
+            ></web-provenance-multiselect>
+        </article>
+
+        <article>
+            <h2>Radio group</h2>
+            <web-provenance-radiobutton
+                id="vanilla-radio"
+                data-label="Pizza topping"
+            ></web-provenance-radiobutton>
+        </article>
+
+        <article>
+            <h2>Checkbox group</h2>
+            <web-provenance-checkbox
+                id="vanilla-checkbox"
+                data-label="Pizza toppings"
+            ></web-provenance-checkbox>
+        </article>
+    </main>
+
+    <h2>Events</h2>
+    <pre id="events">Interact with a widget to see its events.</pre>
+
+    <script src="../../dist/web-components/index.js"></script>
+    <script>
+        const cities = [
+            { label: "New York", value: "new-york" },
+            { label: "London", value: "london" },
+            { label: "Paris", value: "paris" },
+        ];
+        const toppings = [
+            { label: "Cheese", value: "cheese" },
+            { label: "Mushroom", value: "mushroom" },
+            { label: "Peppers", value: "peppers" },
+        ];
+
+        const dropdown =
+            document.querySelector("#vanilla-dropdown");
+        dropdown.options = cities;
+        dropdown.selected = "london";
+
+        const multiselect =
+            document.querySelector("#vanilla-multiselect");
+        multiselect.options = cities;
+        multiselect.selected = ["new-york", "paris"];
+
+        const radio =
+            document.querySelector("#vanilla-radio");
+        radio.data = toppings;
+        radio.selected = "cheese";
+
+        const checkbox =
+            document.querySelector("#vanilla-checkbox");
+        checkbox.data = toppings;
+        checkbox.selected = ["cheese", "peppers"];
+
+        const output = document.querySelector("#events");
+        for (const eventName of [
+            "valueChange",
+            "highValueChange",
+            "selectedChange",
+            "provenanceChange",
+        ]) {
+            document.addEventListener(eventName, event => {
+                output.textContent =
+                    `${event.type} from #${event.target.id}\n` +
+                    JSON.stringify(event.detail, null, 2);
+            });
+        }
+    </script>
+</body>
+</html>

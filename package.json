@@ -8,10 +8,15 @@
     ".": {
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    }
+    },
+    "./web-components": "./dist/web-components/index.js",
+    "./web-components/index.js": "./dist/web-components/index.js",
+    "./web-components/styles.css": "./dist/web-components/styles.css"
   },
   "files": [
-    "dist"
+    "dist",
+    "docs",
+    "examples"
   ],
   "peerDependencies": {
     "preact": "^10.29.2",
@@ -32,7 +37,9 @@
   },
   "scripts": {
     "test": "node --test",
-    "build": "tsup",
+    "build": "npm run build:library && npm run build:web-components",
+    "build:library": "tsup",
+    "build:web-components": "tsup --config tsup.web-components.config.ts && node scripts/prepare-web-components.mjs",
     "prepack": "npm run build",
     "prepare": "npm run build"
   },

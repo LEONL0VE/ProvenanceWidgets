@@ -5,9 +5,7 @@ const isInteractionRecord = record =>
 
 export const hasUserProvenance = provenance => {
     if (!provenance?.detailedData) return false;
-    if (provenance.hasUserInteracted !== undefined) {
-        return provenance.hasUserInteracted === true;
-    }
+    if (provenance.hasUserInteracted === true) return true;
 
     for (const value of provenance.detailedData.values()) {
         if (Array.isArray(value)) {

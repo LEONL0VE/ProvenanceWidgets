@@ -25,6 +25,13 @@ test("keeps the footprint disabled for a baseline-only slider", () => {
     }), "disabled");
 });
 
+test("detects interaction records when a framework flag is stale", () => {
+    assert.equal(hasUserProvenance(provenance({
+        interacted: false,
+        kind: "interaction",
+    })), true);
+});
+
 test("switches the footprint between Aggregate and Temporal states", () => {
     const interacted = provenance({ interacted: true });
     assert.equal(getProvenanceButtonState({
