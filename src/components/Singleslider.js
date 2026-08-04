@@ -17,6 +17,7 @@ import useElementSize from "./hooks/useElementSize.js";
 import useProvenanceTooltip from "./hooks/useProvenanceTooltip.js";
 import { generateRange } from "./utils.js";
 import Chart from "./Chart.js";
+import SliderTickMarks from "./SliderTickMarks.js";
 import {
     formatAggregateTooltip,
     getTooltipAnchorProps,
@@ -45,7 +46,13 @@ const Singleslider = (props) => {
     const min = props.min ?? options.floor ?? 0;
     const max = props.max ?? options.ceil ?? 100;
     const step = props.step ?? options.step ?? 1;
-    const initialValue = props.value ?? props.defaultValue ?? min;
+    const showTicks = props.showTicks ?? options.showTicks ?? false;
+    const tickStep = props.tickStep ?? options.tickStep ?? step;
+    const ticksArray = props.ticksArray ?? options.ticksArray;
+    const trackBottom = showTicks ? 24 : 0;
+    const initialValueRef = useRef(
+        props.value ?? props.defaultValue ?? min
+    );
     const tooltipLabel =
         props.dataLabel ?? props["data-label"] ?? props.id;
     const visualize = props.visualize ?? true;
@@ -86,11 +93,12 @@ const Singleslider = (props) => {
         provenance: serializedProvenance,
         mode: provenanceMode,
         recordInteraction,
+        recordExternalChange,
         restoreValue,
     } = useProvenanceController({
         id: props.id,
         widgetType: "single-slider",
-        value: initialValue,
+        value: initialValueRef.current,
         provenance: props.provenance,
         mode: props.mode,
         sampleIntervalMs: props.sampleIntervalMs,
@@ -100,10 +108,51 @@ const Singleslider = (props) => {
             props.onProvenanceChange ?? props.provenanceChange,
         strategyFactory,
     });
+    // Display value tracks the slider thumb position during a drag.
+    // It follows intermediate onChange steps, while currentValue (from the
+    // controller) only updates when provenance is actually committed.
+    const [displayValue, setDisplayValue] = useState(currentValue);
     const currentValueRef = useRef(currentValue);
     currentValueRef.current = currentValue;
     const serializedProvenanceRef = useRef(serializedProvenance);
     serializedProvenanceRef.current = serializedProvenance;
+    const emittedValueRef = useRef(null);
+    const controlledValue = props.value;
+    const previousControlledValueRef = useRef(controlledValue);
+    const previousProvenanceRef = useRef(props.provenance);
+
+    // Controlled parent echoes each intermediate drag value back through props.
+    // Filter out parent echoes during a drag so they do not record extra
+    // provenance interactions; record genuine external changes from outside.
+    useEffect(() => {
+        const provenanceChanged =
+            props.provenance !== previousProvenanceRef.current;
+        const controlledChanged =
+            controlledValue !== previousControlledValueRef.current;
+
+        if (controlledValue !== undefined && controlledChanged) {
+            setDisplayValue(controlledValue);
+            if (
+                emittedValueRef.current === controlledValue ||
+                provenanceChanged
+            ) {
+                emittedValueRef.current = null;
+            } else {
+                recordExternalChange(controlledValue, {
+                    caller: "controlled-value",
+                });
+            }
+        }
+
+        previousControlledValueRef.current = controlledValue;
+        previousProvenanceRef.current = props.provenance;
+    }, [controlledValue, props.provenance, recordExternalChange]);
+
+    // Sync display value when the committed value changes (provenance
+    // record, restore, external change, or provenance replacement).
+    useEffect(() => {
+        if (currentValue !== undefined) setDisplayValue(currentValue);
+    }, [currentValue]);
 
     const applyRegisteredValue = useCallback(
         (nextValue, source = "history") => {
@@ -206,14 +255,25 @@ const Singleslider = (props) => {
         applyRegisteredValue(revertedValue, "history");
     }, [revertedValue, applyRegisteredValue]);
 
+    // Live drag: update display value and notify the parent, but do NOT
+    // record provenance yet.
     const handleChange = event => {
         const nextValue = Number(event.value);
         if (!Number.isFinite(nextValue)) return;
 
-        // Record first so a controlled value echoed back by the parent is not
-        // misclassified by the hook as a second, external update.
+        emittedValueRef.current = nextValue;
+        setDisplayValue(nextValue);
+        callValueCallbacks(propsRef.current, nextValue, event);
+    };
+
+    // Drag end: commit the final value into provenance history.
+    const handleSlideEnd = event => {
+        const nextValue = Number(event.value ?? displayValue);
+        if (!Number.isFinite(nextValue)) return;
+
+        emittedValueRef.current = nextValue;
         recordInteraction(nextValue);
-        callValueCallbacks(props, nextValue, event);
+        callValueCallbacks(propsRef.current, nextValue, event);
     };
 
     return (
@@ -221,135 +281,158 @@ const Singleslider = (props) => {
             ref={setContainerRef}
             data-label={tooltipLabel}
             style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "5px",
                 marginTop: "1rem",
                 width: "100%",
                 position: "relative",
             }}
         >
-            {visualize && containerWidth > 0 && hasProvenance && (
-                <div
-                    style={{
-                        position: "relative",
-                        width: containerWidth,
-                        height: 50,
-                    }}
-                >
+            <div
+                style={{
+                    position: "relative",
+                    width: "100%",
+                    height: showTicks ? "76px" : "52px",
+                }}
+            >
+                {visualize && containerWidth > 0 && hasProvenance && (
                     <div
                         style={{
                             position: "absolute",
-                            inset: 0,
-                            pointerEvents: "none",
+                            left: 0,
+                            bottom: `${trackBottom + 2}px`,
+                            width: containerWidth,
+                            height: 50,
                         }}
                     >
-                        <Bars
-                            guidance={strategy}
-                            orientationScheme={interpolateOranges}
-                            barKeys={barKeys}
-                            encodings={{
-                                orientation: "vertical",
-                                positionDomain: "count",
-                                colorDomain: "index",
+                        <div
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                pointerEvents: "none",
                             }}
-                            width={containerWidth}
-                            height={50}
-                            layout="slider"
-                            barWidthFactor={0.25}
-                        />
-                    </div>
-                    <div
-                        style={{
-                            position: "absolute",
-                            inset: 0,
-                            pointerEvents: "none",
-                        }}
-                    >
-                        {barKeys.map((key, index) => {
-                            const record = strategy.aggregateData?.get(key);
-                            if (!record) return null;
+                        >
+                            <Bars
+                                guidance={strategy}
+                                orientationScheme={interpolateOranges}
+                                barKeys={barKeys}
+                                encodings={{
+                                    orientation: "vertical",
+                                    positionDomain: "count",
+                                    colorDomain: "index",
+                                }}
+                                width={containerWidth}
+                                height={50}
+                                layout="slider"
+                                barWidthFactor={0.25}
+                            />
+                        </div>
+                        <div
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                pointerEvents: "none",
+                            }}
+                        >
+                            {barKeys.map((key, index) => {
+                                const record = strategy.aggregateData?.get(key);
+                                if (!record) return null;
 
-                            const tooltipProps = getTooltipAnchorProps(
-                                tooltip,
-                                formatAggregateTooltip({
-                                    label: tooltipLabel,
-                                    value: key,
-                                    record,
-                                    kind: "slider",
-                                    sequenceIndex: Math.max(
-                                        0,
-                                        (record.index ?? 1) - 1
-                                    ),
-                                    sequenceTotal: Math.max(
-                                        0,
-                                        (strategy.detailedData?.size ?? 1) - 1
-                                    ),
-                                })
-                            );
+                                const tooltipProps = getTooltipAnchorProps(
+                                    tooltip,
+                                    formatAggregateTooltip({
+                                        label: tooltipLabel,
+                                        value: key,
+                                        record,
+                                        kind: "slider",
+                                        sequenceIndex: Math.max(
+                                            0,
+                                            (record.index ?? 1) - 1
+                                        ),
+                                        sequenceTotal: Math.max(
+                                            0,
+                                            (strategy.detailedData?.size ?? 1) - 1
+                                        ),
+                                    })
+                                );
 
-                            return (
-                                <div
-                                    key={key}
-                                    {...tooltipProps}
-                                    role="button"
-                                    tabIndex={0}
-                                    data-provenance-aggregate-value={key}
-                                    aria-label={`Restore ${tooltipLabel} to ${key}`}
-                                    onClick={() =>
-                                        applyRegisteredValue(
-                                            Number(key),
-                                            "history"
-                                        )
-                                    }
-                                    onKeyDown={event => {
-                                        if (
-                                            event.key === "Enter" ||
-                                            event.key === " "
-                                        ) {
-                                            event.preventDefault();
+                                return (
+                                    <div
+                                        key={key}
+                                        {...tooltipProps}
+                                        role="button"
+                                        tabIndex={0}
+                                        data-provenance-aggregate-value={key}
+                                        aria-label={`Restore ${tooltipLabel} to ${key}`}
+                                        onClick={() =>
                                             applyRegisteredValue(
                                                 Number(key),
                                                 "history"
-                                            );
+                                            )
                                         }
-                                    }}
-                                    style={{
-                                        ...tooltipProps.style,
-                                        position: "absolute",
-                                        left:
-                                            `${(index / barKeys.length) * 100}%`,
-                                        width:
-                                            `${100 / barKeys.length}%`,
-                                        top: 0,
-                                        bottom: 0,
-                                        background: "transparent",
-                                        cursor: "pointer",
-                                    }}
-                                />
-                            );
-                        })}
+                                        onKeyDown={event => {
+                                            if (
+                                                event.key === "Enter" ||
+                                                event.key === " "
+                                            ) {
+                                                event.preventDefault();
+                                                applyRegisteredValue(
+                                                    Number(key),
+                                                    "history"
+                                                );
+                                            }
+                                        }}
+                                        style={{
+                                            ...tooltipProps.style,
+                                            position: "absolute",
+                                            left:
+                                                `${(index / barKeys.length) * 100}%`,
+                                            width:
+                                                `${100 / barKeys.length}%`,
+                                            top: 0,
+                                            bottom: 0,
+                                            background: "transparent",
+                                            cursor: "pointer",
+                                        }}
+                                    />
+                                );
+                            })}
+                        </div>
                     </div>
+                )}
+                <div
+                    style={{
+                        position: "absolute",
+                        left: 0,
+                        right: 0,
+                        bottom: trackBottom,
+                        display: "flex",
+                        alignItems: "center",
+                        width: "100%",
+                    }}
+                >
+                    <Slider_
+                        {...props.sliderProps}
+                        aria-label={props["aria-label"] ?? tooltipLabel}
+                        style={{ width: "100%", ...props.sliderProps?.style }}
+                        step={step}
+                        max={max}
+                        min={min}
+                        value={displayValue}
+                        onChange={handleChange}
+                        onSlideEnd={handleSlideEnd}
+                    />
                 </div>
-            )}
-            <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "5px",
-                    width: "100%",
-                }}
-            >
-                <Slider_
-                    {...props.sliderProps}
-                    aria-label={props["aria-label"] ?? tooltipLabel}
-                    style={{ width: "100%", ...props.sliderProps?.style }}
-                    step={step}
-                    max={max}
-                    min={min}
-                    value={currentValue}
-                    onChange={handleChange}
-                />
+                {showTicks && (
+                    <SliderTickMarks
+                        min={min}
+                        max={max}
+                        step={step}
+                        tickStep={tickStep}
+                        ticksArray={ticksArray}
+                        values={displayValue}
+                        formatValue={options.translate}
+                        trackBottom={trackBottom}
+                    />
+                )}
             </div>
 
             {visualize && isDropdownVisible && (

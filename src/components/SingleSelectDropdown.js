@@ -207,6 +207,7 @@ const SingleSelectItem = ({
                 orientationScheme={interpolateOranges}
                 containerWidth={containerWidth}
                 showTimeline={showTimeline}
+                disableOverlay={!visualize || !hasProvenance}
                 positionDomain="selections"
                 colorDomain={
                     mode === "time"

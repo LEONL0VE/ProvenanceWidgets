@@ -213,6 +213,7 @@ const MultiSelectItem = ({
                 orientationScheme={interpolateOranges}
                 containerWidth={containerWidth}
                 showTimeline={showTimeline}
+                disableOverlay={!visualize || !hasProvenance}
                 positionDomain="interactions"
                 colorDomain={
                     mode === "time"

@@ -241,10 +241,15 @@ const InputText = (props) => {
     }, [revertedValue, applyRegisteredValue]);
 
     const suggestions = useMemo(() => {
-        if (!strategy?.aggregateData) return [];
+        if (!strategy?.aggregateData || !hasProvenance) return [];
 
         const query = text.toLocaleLowerCase();
         const entries = [...strategy.aggregateData.entries()]
+            .filter(([value]) => (
+                value !== "" &&
+                value !== undefined &&
+                value !== null
+            ))
             .filter(([value]) => (
                 !query ||
                 String(value).toLocaleLowerCase().includes(query)

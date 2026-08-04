@@ -282,6 +282,7 @@ const Radiobutton = ({
                         orientationScheme={interpolateOranges}
                         containerWidth={containerWidth}
                         showTimeline={showTimeline}
+                        disableOverlay={!visualize || !hasProvenance}
                         positionDomain="selections"
                         colorDomain={
                             provenanceMode === "time"

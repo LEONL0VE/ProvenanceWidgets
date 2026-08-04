@@ -1,6 +1,7 @@
 import {
     getBarFillRatio,
     getBarLabelColor,
+    shouldRenderBarLabelOverlay,
 } from './utils.js';
 
 const ROW_HORIZONTAL_PADDING = 8;
@@ -17,10 +18,11 @@ const DropdownBarLabel = ({
     orientationScheme,
     containerWidth,
     showTimeline,
+    disableOverlay = false,
     positionDomain = "interactions",
     colorDomain = "index",
 }) => {
-    const barLabelColor = showTimeline
+    const barLabelColor = showTimeline || disableOverlay
         ? 'black'
         : getBarLabelColor(
             value,
@@ -50,9 +52,12 @@ const DropdownBarLabel = ({
             }}
         >
             {children}
-            {!showTimeline
-                && barLabelColor === 'white'
-                && whiteOverlayWidth > 0 && (
+            {shouldRenderBarLabelOverlay({
+                showTimeline,
+                disableOverlay,
+                barLabelColor,
+                whiteOverlayWidth,
+            }) && (
                     <span
                         aria-hidden="true"
                         style={{

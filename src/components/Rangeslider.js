@@ -15,6 +15,7 @@ import useWidgetRegistry from "./hooks/useWidgetRegistry.js";
 import useElementSize from "./hooks/useElementSize.js";
 import useProvenanceTooltip from "./hooks/useProvenanceTooltip.js";
 import Chart from "./Chart.js";
+import SliderTickMarks from "./SliderTickMarks.js";
 import RangeSliderBars from "./RangeSliderBars.js";
 import {
     callRangeSliderCallbacks,
@@ -42,6 +43,12 @@ const Rangeslider = (props) => {
     const min = props.min ?? options.floor ?? 0;
     const max = props.max ?? options.ceil ?? 100;
     const step = props.step ?? options.step ?? 1;
+    const showTicks = props.showTicks ?? options.showTicks ?? false;
+    const tickStep = props.tickStep ?? options.tickStep ?? step;
+    const ticksArray = props.ticksArray ?? options.ticksArray;
+    const trackBottom = showTicks ? 24 : 0;
+    const recordControlledExternalChanges =
+        props.recordExternalChanges ?? true;
     const initialValueRef = useRef(
         getInitialRangeSliderValue(props, min, max)
     );
@@ -146,7 +153,7 @@ const Rangeslider = (props) => {
                 provenanceChanged
             ) {
                 emittedValueKeyRef.current = null;
-            } else {
+            } else if (recordControlledExternalChanges) {
                 recordExternalChange(controlledValue, {
                     caller: "controlled-value",
                 });
@@ -159,6 +166,7 @@ const Rangeslider = (props) => {
         controlledValueKey,
         props.provenance,
         recordExternalChange,
+        recordControlledExternalChanges,
         min,
         max,
     ]);
@@ -320,7 +328,7 @@ const Rangeslider = (props) => {
                 style={{
                     position: "relative",
                     width: "100%",
-                    height: "52px",
+                    height: showTicks ? "76px" : "52px",
                 }}
             >
                 {visualize &&
@@ -330,7 +338,7 @@ const Rangeslider = (props) => {
                             style={{
                                 position: "absolute",
                                 left: 0,
-                                bottom: "2px",
+                                bottom: `${trackBottom + 2}px`,
                                 lineHeight: 0,
                             }}
                         >
@@ -372,7 +380,7 @@ const Rangeslider = (props) => {
                         position: "absolute",
                         left: 0,
                         right: 0,
-                        bottom: 0,
+                        bottom: trackBottom,
                         display: "flex",
                         alignItems: "center",
                         width: "100%",
@@ -396,6 +404,18 @@ const Rangeslider = (props) => {
                         onSlideEnd={handleSlideEnd}
                     />
                 </div>
+                {showTicks && (
+                    <SliderTickMarks
+                        min={min}
+                        max={max}
+                        step={step}
+                        tickStep={tickStep}
+                        ticksArray={ticksArray}
+                        values={displayValue}
+                        formatValue={options.translate}
+                        trackBottom={trackBottom}
+                    />
+                )}
             </div>
 
             {visualize && isDropdownVisible && (

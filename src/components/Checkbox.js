@@ -305,6 +305,7 @@ const Checkbox = ({
                         orientationScheme={interpolateOranges}
                         containerWidth={containerWidth}
                         showTimeline={showTimeline}
+                        disableOverlay={!visualize || !hasProvenance}
                         positionDomain="interactions"
                         colorDomain={
                             provenanceMode === "time"

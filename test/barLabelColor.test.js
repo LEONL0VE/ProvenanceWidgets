@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
     getBarFillRatio,
     getBarLabelColor,
+    shouldRenderBarLabelOverlay,
 } from '../src/components/utils.js';
 
 const guidanceWith = (record) => ({
@@ -78,4 +79,27 @@ test('clamps invalid or out-of-domain bar ratios', () => {
 
     assert.equal(getBarFillRatio('option', aboveDomain), 1);
     assert.equal(getBarFillRatio('option', zeroWidthDomain), 0);
+});
+
+test('does not render a white overlay when provenance is hidden or absent', () => {
+    const base = {
+        showTimeline: false,
+        barLabelColor: 'white',
+        whiteOverlayWidth: 50,
+    };
+
+    assert.equal(
+        shouldRenderBarLabelOverlay({
+            ...base,
+            disableOverlay: true,
+        }),
+        false
+    );
+    assert.equal(
+        shouldRenderBarLabelOverlay({
+            ...base,
+            disableOverlay: false,
+        }),
+        true
+    );
 });

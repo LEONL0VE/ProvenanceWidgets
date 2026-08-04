@@ -108,3 +108,17 @@ export function getBarFillRatio(
         Math.min(1, (position - domainStart) / (domainEnd - domainStart))
     );
 }
+
+export function shouldRenderBarLabelOverlay({
+    showTimeline,
+    disableOverlay,
+    barLabelColor,
+    whiteOverlayWidth,
+}) {
+    return (
+        !showTimeline &&
+        !disableOverlay &&
+        barLabelColor === 'white' &&
+        whiteOverlayWidth > 0
+    );
+}
