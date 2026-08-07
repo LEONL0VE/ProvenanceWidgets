@@ -13,7 +13,7 @@ import useProvenanceController from "./hooks/useProvenanceController.js";
 import useRevertedValue from "./hooks/useRevertedValue.js";
 import useWidgetRegistry from "./hooks/useWidgetRegistry.js";
 import useProvenanceTooltip from "./hooks/useProvenanceTooltip.js";
-import { getScentColor } from "./utils.js";
+import { getContrastColor, getScentColor } from "./utils.js";
 import Chart from "./Chart.js";
 import {
     callInputTextCallbacks,
@@ -407,6 +407,13 @@ const InputText = (props) => {
                             width,
                             color,
                         }) => {
+                            const displayValue = value === ""
+                                ? "<empty>"
+                                : value;
+                            const needsWhiteBarLabel =
+                                visualize &&
+                                getContrastColor(color) === "white" &&
+                                Number.parseFloat(width) > 0;
                             const tooltipProps = visualize
                                 ? getTooltipAnchorProps(
                                     tooltip,
@@ -482,12 +489,32 @@ const InputText = (props) => {
                                             position: "relative",
                                             zIndex: 1,
                                             pointerEvents: "none",
+                                            color: "black",
                                         }}
                                     >
-                                        {value === ""
-                                            ? "<empty>"
-                                            : value}
+                                        {displayValue}
                                     </span>
+                                    {needsWhiteBarLabel && (
+                                        <span
+                                            aria-hidden="true"
+                                            style={{
+                                                position: "absolute",
+                                                inset: "0 auto 0 0",
+                                                width,
+                                                boxSizing: "border-box",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                padding: "6px 10px",
+                                                overflow: "hidden",
+                                                color: "white",
+                                                whiteSpace: "nowrap",
+                                                zIndex: 2,
+                                                pointerEvents: "none",
+                                            }}
+                                        >
+                                            {displayValue}
+                                        </span>
+                                    )}
                                 </div>
                             );
                         })}
