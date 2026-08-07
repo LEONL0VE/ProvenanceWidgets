@@ -1,6 +1,8 @@
 const clamp = (value, min, max) =>
     Math.min(max, Math.max(min, value));
 
+export const PW1_TEMPORAL_LINE_COLOR = "#495057";
+
 export const normalizeTemporalBrush = value => value === true;
 
 export const brushSelectionToIndexRange = (
@@ -126,6 +128,74 @@ export const getTemporalYPositions = (
             drawableHeight
         )
     );
+};
+
+const getRangeEndpoint = (record, endpoint, domainMax) => {
+    if (!record?.select) return null;
+    if (endpoint === "low") return record.select.index;
+    return record.unselect?.index ?? domainMax;
+};
+
+/**
+ * Builds independent low and high trajectories for slider history. A range's
+ * endpoints must never be joined to each other or crossed between rows: low
+ * connects to the next low, and high connects to the next high.
+ */
+export const buildTemporalSliderConnections = ({
+    entries,
+    yPositions,
+    domainMin,
+    domainMax,
+    range = false,
+}) => {
+    if (
+        !Array.isArray(entries) ||
+        !Array.isArray(yPositions) ||
+        entries.length < 2 ||
+        yPositions.length !== entries.length
+    ) {
+        return [];
+    }
+
+    const domainSpan = domainMax - domainMin;
+    if (!Number.isFinite(domainSpan) || domainSpan <= 0) return [];
+
+    const endpoints = range ? ["low", "high"] : ["low"];
+    const connections = [];
+    for (let index = 0; index < entries.length - 1; index += 1) {
+        const currentRecord = getEntryRecord(entries[index]);
+        const nextRecord = getEntryRecord(entries[index + 1]);
+
+        for (const endpoint of endpoints) {
+            const currentValue = getRangeEndpoint(
+                currentRecord,
+                endpoint,
+                domainMax
+            );
+            const nextValue = getRangeEndpoint(
+                nextRecord,
+                endpoint,
+                domainMax
+            );
+            if (
+                !Number.isFinite(currentValue) ||
+                !Number.isFinite(nextValue)
+            ) {
+                continue;
+            }
+
+            connections.push({
+                endpoint,
+                fromIndex: index,
+                toIndex: index + 1,
+                x1: ((currentValue - domainMin) / domainSpan) * 100,
+                y1: yPositions[index],
+                x2: ((nextValue - domainMin) / domainSpan) * 100,
+                y2: yPositions[index + 1],
+            });
+        }
+    }
+    return connections;
 };
 
 export const restoreTemporalPoint = ({

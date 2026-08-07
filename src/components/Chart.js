@@ -12,10 +12,12 @@ import useWidgetRegistry from './hooks/useWidgetRegistry.js';
 import { interpolateOranges } from 'd3'; // Import color scale
 import { formatTemporalTooltip, getTooltipAnchorProps } from './provenanceTooltip.js';
 import {
+    buildTemporalSliderConnections,
     brushSelectionToPositionRange,
     filterTemporalEntries,
     getTemporalYPositions,
     normalizeTemporalBrush,
+    PW1_TEMPORAL_LINE_COLOR,
     restoreTemporalPoint,
 } from './singleSliderTemporal.js';
 import {
@@ -24,6 +26,9 @@ import {
 } from './inputTextValue.js';
 
 const TEMPORAL_BRUSH_HEIGHT = 240;
+// PW 1.0 keeps the temporal slider plot at a fixed height and compresses
+// additional interactions into that domain instead of growing a scroll area.
+const TEMPORAL_SLIDER_HEIGHT = 250;
 
 const TemporalBrush = ({
     mode,
@@ -677,12 +682,9 @@ const Chart = ({
         const sortedEntries = brushEnabled
             ? filterTemporalEntries(allSortedEntries, brushRange)
             : allSortedEntries;
-        const temporalPlotHeight = Math.max(
-            32,
-            brushEnabled
-                ? TEMPORAL_BRUSH_HEIGHT
-                : sortedEntries.length * 32
-        );
+        const temporalPlotHeight = brushEnabled
+            ? TEMPORAL_BRUSH_HEIGHT
+            : TEMPORAL_SLIDER_HEIGHT;
         const temporalYPositions = getTemporalYPositions(
             sortedEntries,
             chartData.mode ?? mode,
@@ -731,6 +733,13 @@ const Chart = ({
             : baseMaxIndex + 1;
         const minIndex = usesContinuousDomain ? domainMin : 0;
         const rangeSpan = maxIndex - minIndex;
+        const temporalSliderConnections = buildTemporalSliderConnections({
+            entries: sortedEntries,
+            yPositions: temporalYPositions,
+            domainMin: minIndex,
+            domainMax: maxIndex,
+            range: chartData.isRangeSlider,
+        });
         const indexOffset = usesContinuousDomain ? 0 : 1;
         const displayMaxIndex = Math.max(maxIndex - indexOffset, 1);
         const displaySpan = displayMaxIndex - minIndex;
@@ -1023,7 +1032,19 @@ const Chart = ({
                              : "Sequence of Interactions"}
                      </div>
                  )}
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto', flexGrow: 1, position: 'relative' }}>
+                 <div style={{
+                     display: 'flex',
+                     flexDirection: 'column',
+                     gap: '8px',
+                     maxHeight: chartData.isRangeSlider || chartData.isSingleSlider
+                         ? 'none'
+                         : '300px',
+                     overflowY: chartData.isRangeSlider || chartData.isSingleSlider
+                         ? 'visible'
+                         : 'auto',
+                     flexGrow: 1,
+                     position: 'relative',
+                 }}>
                  
                  {/* 
                     For Range Slider, user wants VERTICAL connecting lines.
@@ -1042,57 +1063,18 @@ const Chart = ({
                             height={temporalPlotHeight}
                             style={{ position: 'absolute', top: 0, left: '6px', width: 'calc(100% - 12px)', height: `${temporalPlotHeight}px`, pointerEvents: 'none', zIndex: 1 }}
                         >
-                            {sortedEntries.map(([label, records], index) => {
-                                if (index === sortedEntries.length - 1) return null; // Last row has no next row to connect to
-                                
-                                // Current Row
-                                const currentRecord = records[0]; 
-                                if (!currentRecord || !currentRecord.select) return null;
-                                const curMin = currentRecord.select.index;
-                                const curMax = currentRecord.unselect ? currentRecord.unselect.index : maxIndex;
-                                
-                                // Next Row
-                                const nextEntry = sortedEntries[index + 1];
-                                const nextRecord = nextEntry[1][0];
-                                if (!nextRecord || !nextRecord.select) return null;
-                                const nextMin = nextRecord.select.index;
-                                const nextMax = nextRecord.unselect ? nextRecord.unselect.index : maxIndex;
-                                
-                                const y1 = temporalYPositions[index];
-                                const y2 = temporalYPositions[index + 1];
-                                
-                                const x1_min = ((curMin - minIndex) / rangeSpan) * 100;
-                                const x2_min = ((nextMin - minIndex) / rangeSpan) * 100;
-                                
-                                const x1_max = ((curMax - minIndex) / rangeSpan) * 100;
-                                const x2_max = ((nextMax - minIndex) / rangeSpan) * 100;
-
-                                // Opacity for lines
-                                 const totalRows = sortedEntries.length;
-                                 const relativeIndex = index / (totalRows - 1 || 1);
-                                 // Oldest is index 0 (top), newest is last (bottom).
-                                 // Make newest darker using interpolateOranges.
-                                 const color = interpolateOranges(0.3 + (relativeIndex * 0.7));
-                                 
-                                 return (
-                                     <g key={index}>
-                                         {/* Min Connection */}
-                                         <line 
-                                             x1={`${x1_min}%`} y1={y1} 
-                                             x2={`${x2_min}%`} y2={y2} 
-                                             stroke={color} strokeWidth="2" 
-                                         />
-                                         {/* Max Connection (Range slider only) */}
-                                         {chartData.isRangeSlider && (
-                                             <line 
-                                                 x1={`${x1_max}%`} y1={y1} 
-                                                 x2={`${x2_max}%`} y2={y2} 
-                                                 stroke={color} strokeWidth="2" 
-                                             />
-                                         )}
-                                     </g>
-                                 );
-                             })}
+                            {temporalSliderConnections.map(connection => (
+                                <line
+                                    key={`${connection.endpoint}-${connection.fromIndex}`}
+                                    data-provenance-temporal-line={connection.endpoint}
+                                    x1={`${connection.x1}%`}
+                                    y1={connection.y1}
+                                    x2={`${connection.x2}%`}
+                                    y2={connection.y2}
+                                    stroke={PW1_TEMPORAL_LINE_COLOR}
+                                    strokeWidth="2"
+                                />
+                            ))}
                          </svg>
 
                          {/* Rows with Points (No horizontal lines) */}
@@ -1110,7 +1092,7 @@ const Chart = ({
                                   <div key={label} style={{
                                       display: 'flex',
                                       alignItems: 'center',
-                                      height: '24px',
+                                      height: '16px',
                                       position: 'absolute',
                                       top: `${temporalYPositions[index] - 8}px`,
                                       left: 0,
@@ -1208,7 +1190,7 @@ const Chart = ({
                                                                 ...lowTooltipProps.style,
                                                                 position: 'absolute',
                                                                 left: `calc(${left}% - 8px)`,
-                                                                top: '-4px',
+                                                                top: 0,
                                                                 width: '16px',
                                                                 height: '16px',
                                                                 borderRadius: '50%',
@@ -1278,7 +1260,7 @@ const Chart = ({
                                                                    ...highTooltipProps.style,
                                                                    position: 'absolute',
                                                                    left: `calc(${right}% - 8px)`,
-                                                                   top: '-4px',
+                                                                   top: 0,
                                                                    width: '16px',
                                                                    height: '16px',
                                                                    borderRadius: '50%',

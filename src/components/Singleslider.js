@@ -18,6 +18,7 @@ import useProvenanceTooltip from "./hooks/useProvenanceTooltip.js";
 import { generateRange } from "./utils.js";
 import Chart from "./Chart.js";
 import SliderTickMarks from "./SliderTickMarks.js";
+import { shouldCommitSingleSliderChange } from "./singleSliderInteraction.js";
 import {
     formatAggregateTooltip,
     getTooltipAnchorProps,
@@ -255,14 +256,18 @@ const Singleslider = (props) => {
         applyRegisteredValue(revertedValue, "history");
     }, [revertedValue, applyRegisteredValue]);
 
-    // Live drag: update display value and notify the parent, but do NOT
-    // record provenance yet.
+    // Live pointer drag is only a preview. Keep both the controlled value and
+    // provenance untouched until PrimeReact reports onSlideEnd. Keyboard
+    // changes have no onSlideEnd counterpart, so each key step commits here.
     const handleChange = event => {
         const nextValue = Number(event.value);
         if (!Number.isFinite(nextValue)) return;
 
-        emittedValueRef.current = nextValue;
         setDisplayValue(nextValue);
+        if (!shouldCommitSingleSliderChange(event)) return;
+
+        emittedValueRef.current = nextValue;
+        recordInteraction(nextValue);
         callValueCallbacks(propsRef.current, nextValue, event);
     };
 

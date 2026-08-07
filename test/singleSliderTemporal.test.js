@@ -1,13 +1,79 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+    buildTemporalSliderConnections,
     brushSelectionToIndexRange,
     brushSelectionToPositionRange,
     filterTemporalEntries,
     getTemporalYPositions,
     normalizeTemporalBrush,
+    PW1_TEMPORAL_LINE_COLOR,
     restoreTemporalPoint,
 } from "../src/components/singleSliderTemporal.js";
+
+test("uses the fixed PW1 temporal trajectory color", () => {
+    assert.equal(PW1_TEMPORAL_LINE_COLOR, "#495057");
+});
+
+test("connects Range Slider low and high endpoints as separate trajectories", () => {
+    const entry = (label, low, high) => [
+        label,
+        [{
+            select: { index: low },
+            unselect: { index: high },
+        }],
+    ];
+    const connections = buildTemporalSliderConnections({
+        entries: [
+            entry("0", 0, 100),
+            entry("1", 0, 100),
+            entry("2", 0, 70),
+        ],
+        yPositions: [8, 125, 242],
+        domainMin: 0,
+        domainMax: 100,
+        range: true,
+    });
+
+    assert.deepEqual(connections, [
+        {
+            endpoint: "low",
+            fromIndex: 0,
+            toIndex: 1,
+            x1: 0,
+            y1: 8,
+            x2: 0,
+            y2: 125,
+        },
+        {
+            endpoint: "high",
+            fromIndex: 0,
+            toIndex: 1,
+            x1: 100,
+            y1: 8,
+            x2: 100,
+            y2: 125,
+        },
+        {
+            endpoint: "low",
+            fromIndex: 1,
+            toIndex: 2,
+            x1: 0,
+            y1: 125,
+            x2: 0,
+            y2: 242,
+        },
+        {
+            endpoint: "high",
+            fromIndex: 1,
+            toIndex: 2,
+            x1: 100,
+            y1: 125,
+            x2: 70,
+            y2: 242,
+        },
+    ]);
+});
 
 test("maps a PW-style vertical brush to an inclusive interaction range", () => {
     assert.deepEqual(
@@ -68,6 +134,25 @@ test("positions time mode records by elapsed time rather than row number", () =>
         getTemporalYPositions(entries, "time", 216),
         [8, 58, 208]
     );
+});
+
+test("condenses long interaction histories into a fixed PW1 plot", () => {
+    const entries = Array.from(
+        { length: 100 },
+        (_, index) => [String(index), [{ select: { index } }]]
+    );
+    const positions = getTemporalYPositions(
+        entries,
+        "interaction",
+        250
+    );
+
+    assert.equal(positions.length, 100);
+    assert.equal(positions[0], 8);
+    assert.equal(positions.at(-1), 242);
+    assert.ok(positions.every((position, index) => (
+        index === 0 || position > positions[index - 1]
+    )));
 });
 
 test("restores a clicked Temporal point through the widget registration", () => {
