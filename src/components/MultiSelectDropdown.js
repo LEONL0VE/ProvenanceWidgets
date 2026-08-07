@@ -45,6 +45,7 @@ import {
     getSelectionTimeDomain,
     normalizeSelectionBrushRange,
 } from "./selectionTimeline.js";
+import { shouldCommitSliderChange } from "./singleSliderInteraction.js";
 
 const MultiSelectItem = ({
     children,
@@ -292,6 +293,8 @@ const MultiSelectDropdown = (props) => {
     } = useWidgetRegistry();
     const [showTimeline, setShowTimeline] = useState(false);
     const [brushRange, setBrushRange] = useState([0, 100]);
+    const [brushDisplayRange, setBrushDisplayRange] =
+        useState([0, 100]);
     const elementRef = useRef(null);
     const dropdownRef = useRef(null);
     const propsRef = useRef(props);
@@ -594,17 +597,9 @@ const MultiSelectDropdown = (props) => {
         });
     };
 
-    const handleBrushChange = event => {
-        setBrushRange(
-            normalizeSelectionBrushRange(event.value)
-        );
-    };
-
-    const handleBrushEnd = event => {
-        const range = normalizeSelectionBrushRange(
-            event.value ?? brushRange
-        );
+    const commitBrushRange = range => {
         setBrushRange(range);
+        setBrushDisplayRange(range);
         window.dispatchEvent(new CustomEvent(
             "provenance-widgets",
             {
@@ -617,6 +612,21 @@ const MultiSelectDropdown = (props) => {
                 },
             }
         ));
+    };
+
+    const handleBrushChange = event => {
+        const range = normalizeSelectionBrushRange(event.value);
+        setBrushDisplayRange(range);
+        if (shouldCommitSliderChange(event)) {
+            commitBrushRange(range);
+        }
+    };
+
+    const handleBrushEnd = event => {
+        const range = normalizeSelectionBrushRange(
+            event.value ?? brushDisplayRange
+        );
+        commitBrushRange(range);
     };
 
     const originalItemTemplate =
@@ -772,7 +782,7 @@ const MultiSelectDropdown = (props) => {
                                             range
                                             min={0}
                                             max={100}
-                                            value={brushRange}
+                                            value={brushDisplayRange}
                                             onChange={handleBrushChange}
                                             onSlideEnd={handleBrushEnd}
                                         />

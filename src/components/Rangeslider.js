@@ -17,6 +17,7 @@ import useProvenanceTooltip from "./hooks/useProvenanceTooltip.js";
 import Chart from "./Chart.js";
 import SliderTickMarks from "./SliderTickMarks.js";
 import RangeSliderBars from "./RangeSliderBars.js";
+import { shouldCommitSliderChange } from "./singleSliderInteraction.js";
 import {
     callRangeSliderCallbacks,
     getControlledRangeSliderValue,
@@ -94,9 +95,8 @@ const Rangeslider = (props) => {
     } = useProvenanceController({
         id: props.id,
         widgetType: "range-slider",
-        // Range controls need to distinguish parent echoes during a drag from
-        // genuine external changes. Keep this hook input stable and perform
-        // the controlled-value comparison below.
+        // Keep the hook input stable and distinguish committed callback
+        // echoes from genuine external controlled-value changes below.
         value: initialValueRef.current,
         provenance: props.provenance,
         mode: props.mode,
@@ -137,9 +137,9 @@ const Rangeslider = (props) => {
         // synchronizes when the committed range actually changes.
     }, [currentValueKey, min, max]);
 
-    // A controlled parent echoes each intermediate drag value back through
-    // props. Those echoes only move the handles; a genuinely new parent value
-    // is recorded as an external provenance interaction.
+    // A controlled parent echoes the released value back through props.
+    // Do not record that echo twice; genuinely new parent values remain
+    // external provenance interactions.
     useEffect(() => {
         const provenanceChanged =
             props.provenance !== previousProvenanceRef.current;
@@ -284,6 +284,13 @@ const Rangeslider = (props) => {
         applyRegisteredValue(revertedValue, "history");
     }, [revertedValue, applyRegisteredValue]);
 
+    const commitValue = (nextValue, event) => {
+        emittedValueKeyRef.current = rangeSliderValueKey(nextValue);
+        recordInteraction(nextValue);
+        setDisplayValue(nextValue);
+        callRangeSliderCallbacks(propsRef.current, nextValue, event);
+    };
+
     const handleChange = event => {
         const nextValue = normalizeRangeSliderValue(
             event.value,
@@ -292,11 +299,10 @@ const Rangeslider = (props) => {
         );
         if (!nextValue) return;
 
-        emittedValueKeyRef.current = rangeSliderValueKey(nextValue);
         setDisplayValue(nextValue);
-        callRangeSliderCallbacks(props, nextValue, event, {
-            includeSelection: false,
-        });
+        if (shouldCommitSliderChange(event)) {
+            commitValue(nextValue, event);
+        }
     };
 
     const handleSlideEnd = event => {
@@ -307,11 +313,7 @@ const Rangeslider = (props) => {
         );
         if (!nextValue) return;
 
-        recordInteraction(nextValue);
-        setDisplayValue(nextValue);
-        callRangeSliderCallbacks(props, nextValue, event, {
-            includeChange: false,
-        });
+        commitValue(nextValue, event);
     };
 
     return (

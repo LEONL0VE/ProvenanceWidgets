@@ -3,5 +3,7 @@
  * with onSlideEnd. Keyboard changes only emit onChange, so those must commit
  * immediately while pointer changes remain previews until release.
  */
-export const shouldCommitSingleSliderChange = event =>
+export const shouldCommitSliderChange = event =>
     event?.originalEvent?.type === "keydown";
+
+export const shouldCommitSingleSliderChange = shouldCommitSliderChange;

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { shouldCommitSingleSliderChange } from
-    "../src/components/singleSliderInteraction.js";
+import {
+    shouldCommitSingleSliderChange,
+    shouldCommitSliderChange,
+} from "../src/components/singleSliderInteraction.js";
 
 test("single slider pointer changes remain previews until slide end", () => {
     for (const type of [
@@ -28,6 +30,18 @@ test("single slider keyboard changes commit without waiting for slide end", () =
             originalEvent: { type: "keydown" },
         }),
         true,
+    );
+});
+
+test("the release boundary is shared by single, range, and brush sliders", () => {
+    const pointerMove = { originalEvent: { type: "pointermove" } };
+    const keyboardStep = { originalEvent: { type: "keydown" } };
+
+    assert.equal(shouldCommitSliderChange(pointerMove), false);
+    assert.equal(shouldCommitSliderChange(keyboardStep), true);
+    assert.equal(
+        shouldCommitSingleSliderChange,
+        shouldCommitSliderChange,
     );
 });
 

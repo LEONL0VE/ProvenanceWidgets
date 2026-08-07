@@ -79,21 +79,14 @@ export const buildInputTextTemporalEntries = ({
 export const callInputTextCallbacks = (
     props,
     value,
-    event,
-    {
-        includeChange = true,
-        includeCommit = true,
-    } = {}
+    event
 ) => {
-    const callbacks = new Set();
-    if (includeChange) {
-        callbacks.add(props.onChange);
-        callbacks.add(props.onInputChange);
-    }
-    if (includeCommit) {
-        callbacks.add(props.onValueChange);
-        callbacks.add(props.valueChange);
-    }
+    const callbacks = new Set([
+        props.onChange,
+        props.onInputChange,
+        props.onValueChange,
+        props.valueChange,
+    ]);
     callbacks.delete(undefined);
     callbacks.delete(null);
     callbacks.forEach(callback => callback(value, event));

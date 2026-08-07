@@ -288,22 +288,15 @@ const InputText = (props) => {
         const changed = recordInteraction(normalized, { caller });
         emittedValueRef.current = normalized;
         setText(normalized);
-        callInputTextCallbacks(props, normalized, event, {
-            // Enter already followed ordinary typing. Selecting a suggestion
-            // can replace the entire value and must also notify onChange.
-            includeChange: caller !== "enter",
-        });
+        // PW1.0 exposes text changes only when Enter is pressed or a history
+        // suggestion is selected. Typing remains a local visual preview.
+        callInputTextCallbacks(propsRef.current, normalized, event);
         return changed;
     };
 
     const handleInputChange = event => {
         const nextValue = String(event.target.value);
-        emittedValueRef.current = nextValue;
         setText(nextValue);
-        callInputTextCallbacks(props, nextValue, event, {
-            includeCommit: false,
-        });
-        props.inputProps?.onChange?.(event);
     };
 
     const handleKeyUp = event => {
@@ -453,8 +446,10 @@ const InputText = (props) => {
                                     aria-selected={text === value}
                                     onMouseDown={event => {
                                         event.preventDefault();
-                                        selectSuggestion(value, event);
                                     }}
+                                    onClick={event =>
+                                        selectSuggestion(value, event)
+                                    }
                                     onKeyDown={event => {
                                         if (
                                             event.key !== "Enter" &&

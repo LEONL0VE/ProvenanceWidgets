@@ -76,18 +76,13 @@ export const rangeSliderValueKey = value =>
 export const callRangeSliderCallbacks = (
     props,
     value,
-    event,
-    {
-        includeChange = true,
-        includeSelection = true,
-    } = {}
+    event
 ) => {
-    const callbacks = new Set();
-    if (includeChange) callbacks.add(props.onChange);
-    if (includeSelection) {
-        callbacks.add(props.onSelectedChange);
-        callbacks.add(props.selectedChange);
-    }
+    const callbacks = new Set([
+        props.onChange,
+        props.onSelectedChange,
+        props.selectedChange,
+    ]);
     callbacks.delete(undefined);
     callbacks.delete(null);
 

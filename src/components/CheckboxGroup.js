@@ -34,6 +34,7 @@ import {
     getSelectionTimeDomain,
     normalizeSelectionBrushRange,
 } from "./selectionTimeline.js";
+import { shouldCommitSliderChange } from "./singleSliderInteraction.js";
 
 export { useCheckboxGroup };
 
@@ -154,6 +155,8 @@ const CheckboxGroup = (props) => {
     } = useWidgetRegistry();
     const [showTimeline, setShowTimeline] = useState(false);
     const [brushRange, setBrushRange] = useState([0, 100]);
+    const [brushDisplayRange, setBrushDisplayRange] =
+        useState([0, 100]);
     const elementRef = useRef(null);
     const propsRef = useRef(props);
     const availableOptionsRef = useRef(availableOptions);
@@ -469,15 +472,9 @@ const CheckboxGroup = (props) => {
         ]
     );
 
-    const handleBrushChange = event => {
-        setBrushRange(normalizeSelectionBrushRange(event.value));
-    };
-
-    const handleBrushEnd = event => {
-        const range = normalizeSelectionBrushRange(
-            event.value ?? brushRange
-        );
+    const commitBrushRange = range => {
         setBrushRange(range);
+        setBrushDisplayRange(range);
         window.dispatchEvent(new CustomEvent(
             "provenance-widgets",
             {
@@ -490,6 +487,21 @@ const CheckboxGroup = (props) => {
                 },
             }
         ));
+    };
+
+    const handleBrushChange = event => {
+        const range = normalizeSelectionBrushRange(event.value);
+        setBrushDisplayRange(range);
+        if (shouldCommitSliderChange(event)) {
+            commitBrushRange(range);
+        }
+    };
+
+    const handleBrushEnd = event => {
+        const range = normalizeSelectionBrushRange(
+            event.value ?? brushDisplayRange
+        );
+        commitBrushRange(range);
     };
 
     const renderedChildren = usesData
@@ -624,7 +636,7 @@ const CheckboxGroup = (props) => {
                                     range
                                     min={0}
                                     max={100}
-                                    value={brushRange}
+                                    value={brushDisplayRange}
                                     onChange={handleBrushChange}
                                     onSlideEnd={handleBrushEnd}
                                     aria-label={

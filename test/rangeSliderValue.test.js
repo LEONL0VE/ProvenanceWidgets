@@ -55,7 +55,7 @@ test("normalizes live range values without creating zero-width history", () => {
     );
 });
 
-test("emits live and completed-selection callbacks at separate phases", () => {
+test("emits every range callback together at the release boundary", () => {
     const calls = [];
     const sharedSelection = value =>
         calls.push(["selection", value]);
@@ -65,15 +65,14 @@ test("emits live and completed-selection callbacks at separate phases", () => {
         selectedChange: sharedSelection,
     };
 
-    callRangeSliderCallbacks(props, [20, 50], { type: "change" }, {
-        includeSelection: false,
-    });
-    callRangeSliderCallbacks(props, [30, 60], { type: "slide-end" }, {
-        includeChange: false,
-    });
+    callRangeSliderCallbacks(
+        props,
+        [30, 60],
+        { type: "slide-end" }
+    );
 
     assert.deepEqual(calls, [
-        ["change", [20, 50]],
+        ["change", [30, 60]],
         ["selection", [30, 60]],
     ]);
     assert.equal(

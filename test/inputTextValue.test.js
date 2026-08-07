@@ -93,24 +93,21 @@ test("commits the live native input value instead of stale component state", () 
     );
 });
 
-test("separates live typing callbacks from committed value callbacks", () => {
+test("emits every Input Text callback together only when committed", () => {
     const calls = [];
     const sharedCommit = value => calls.push(["commit", value]);
     const props = {
         onChange: value => calls.push(["change", value]),
+        onInputChange: value => calls.push(["input", value]),
         onValueChange: sharedCommit,
         valueChange: sharedCommit,
     };
 
-    callInputTextCallbacks(props, "piz", { type: "change" }, {
-        includeCommit: false,
-    });
-    callInputTextCallbacks(props, "pizza", { type: "keyup" }, {
-        includeChange: false,
-    });
+    callInputTextCallbacks(props, "pizza", { type: "keyup" });
 
     assert.deepEqual(calls, [
-        ["change", "piz"],
+        ["change", "pizza"],
+        ["input", "pizza"],
         ["commit", "pizza"],
     ]);
 });
