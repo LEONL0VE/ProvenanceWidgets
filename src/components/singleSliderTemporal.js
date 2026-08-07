@@ -2,6 +2,7 @@ const clamp = (value, min, max) =>
     Math.min(max, Math.max(min, value));
 
 export const PW1_TEMPORAL_LINE_COLOR = "#495057";
+export const PW1_TEMPORAL_LINE_WIDTH = 1;
 
 export const normalizeTemporalBrush = value => value === true;
 

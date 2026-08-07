@@ -18,6 +18,7 @@ import {
     getTemporalYPositions,
     normalizeTemporalBrush,
     PW1_TEMPORAL_LINE_COLOR,
+    PW1_TEMPORAL_LINE_WIDTH,
     restoreTemporalPoint,
 } from './singleSliderTemporal.js';
 import {
@@ -1061,7 +1062,7 @@ const Chart = ({
                         {/* SVG Overlay for Vertical Lines */}
                         <svg
                             height={temporalPlotHeight}
-                            style={{ position: 'absolute', top: 0, left: '6px', width: 'calc(100% - 12px)', height: `${temporalPlotHeight}px`, pointerEvents: 'none', zIndex: 1 }}
+                            style={{ position: 'absolute', top: 0, left: '6px', width: 'calc(100% - 12px)', height: `${temporalPlotHeight}px`, overflow: 'visible', pointerEvents: 'none', zIndex: 0 }}
                         >
                             {temporalSliderConnections.map(connection => (
                                 <line
@@ -1072,7 +1073,7 @@ const Chart = ({
                                     x2={`${connection.x2}%`}
                                     y2={connection.y2}
                                     stroke={PW1_TEMPORAL_LINE_COLOR}
-                                    strokeWidth="2"
+                                    strokeWidth={PW1_TEMPORAL_LINE_WIDTH}
                                 />
                             ))}
                          </svg>
@@ -1097,6 +1098,7 @@ const Chart = ({
                                       top: `${temporalYPositions[index] - 8}px`,
                                       left: 0,
                                       right: 0,
+                                      zIndex: 1,
                                   }}>
                                       {/* Timeline takes full space with safe inset for endpoint visibility */}
                                       <div style={{ position: 'absolute', top: 0, left: '6px', width: 'calc(100% - 12px)', height: '100%', background: 'transparent', borderRadius: '3px', zIndex: 0 }}>
@@ -1213,7 +1215,7 @@ const Chart = ({
                                                                     height: '8px',
                                                                     borderRadius: '50%',
                                                                     backgroundColor: color,
-                                                                    border: `1px solid ${d3.color(color).darker()}`,
+                                                                    border: `1px solid ${PW1_TEMPORAL_LINE_COLOR}`,
                                                                     pointerEvents: 'none',
                                                                 }}
                                                             />
@@ -1283,7 +1285,7 @@ const Chart = ({
                                                                        height: '8px',
                                                                        borderRadius: '50%',
                                                                        backgroundColor: color,
-                                                                       border: `1px solid ${d3.color(color).darker()}`,
+                                                                       border: `1px solid ${PW1_TEMPORAL_LINE_COLOR}`,
                                                                        pointerEvents: 'none',
                                                                    }}
                                                                />

@@ -8,11 +8,13 @@ import {
     getTemporalYPositions,
     normalizeTemporalBrush,
     PW1_TEMPORAL_LINE_COLOR,
+    PW1_TEMPORAL_LINE_WIDTH,
     restoreTemporalPoint,
 } from "../src/components/singleSliderTemporal.js";
 
 test("uses the fixed PW1 temporal trajectory color", () => {
     assert.equal(PW1_TEMPORAL_LINE_COLOR, "#495057");
+    assert.equal(PW1_TEMPORAL_LINE_WIDTH, 1);
 });
 
 test("connects Range Slider low and high endpoints as separate trajectories", () => {
