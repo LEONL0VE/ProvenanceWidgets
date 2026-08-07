@@ -9,7 +9,7 @@ const SingleSliderBars = ({
     width,
     height,
     orientationScheme,
-    barWidthFactor = 0.25,
+    barWidth,
 }) => {
     const domainMin = Number(min);
     const domainMax = Number(max);
@@ -52,8 +52,7 @@ const SingleSliderBars = ({
                     min: domainMin,
                     max: domainMax,
                     width,
-                    keyCount: barKeys.length,
-                    barWidthFactor,
+                    barWidth,
                 });
                 const isRecent = key === recentKey;
 

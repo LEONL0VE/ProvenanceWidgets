@@ -324,7 +324,6 @@ const Singleslider = (props) => {
                                 max={max}
                                 width={containerWidth}
                                 height={50}
-                                barWidthFactor={0.25}
                             />
                         </div>
                         <div

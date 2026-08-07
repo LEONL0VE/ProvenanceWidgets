@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
     getSingleSliderBarGeometry,
+    SINGLE_SLIDER_BAR_WIDTH,
 } from "../src/components/singleSliderBarGeometry.js";
 
 test("single-slider bars center on the continuous slider coordinate", () => {
@@ -11,12 +12,10 @@ test("single-slider bars center on the continuous slider coordinate", () => {
         min: 1955,
         max: 2000,
         width: 405,
-        keyCount: 10,
-        barWidthFactor: 0.25,
     });
 
     assert.equal(geometry.center, 225);
-    assert.equal(geometry.width, 11.25);
+    assert.equal(geometry.width, SINGLE_SLIDER_BAR_WIDTH);
     assert.equal(geometry.x + geometry.width / 2, geometry.center);
 });
 
@@ -25,8 +24,6 @@ test("single-slider endpoint bars remain centered on both endpoints", () => {
         min: 0,
         max: 100,
         width: 460,
-        keyCount: 21,
-        barWidthFactor: 0.25,
     };
 
     const first = getSingleSliderBarGeometry({ ...shared, value: 0 });
@@ -36,4 +33,22 @@ test("single-slider endpoint bars remain centered on both endpoints", () => {
     assert.equal(last.center, 460);
     assert.equal(first.x + first.width / 2, 0);
     assert.equal(last.x + last.width / 2, 460);
+});
+
+test("single-slider bars keep the PW1 fixed width across page sizes", () => {
+    const compactPage = getSingleSliderBarGeometry({
+        value: 50,
+        min: 0,
+        max: 100,
+        width: 280,
+    });
+    const widePage = getSingleSliderBarGeometry({
+        value: 1980,
+        min: 1955,
+        max: 2000,
+        width: 640,
+    });
+
+    assert.equal(compactPage.width, 8);
+    assert.equal(widePage.width, 8);
 });
