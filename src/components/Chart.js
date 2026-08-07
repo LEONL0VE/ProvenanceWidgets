@@ -30,6 +30,9 @@ const TEMPORAL_BRUSH_HEIGHT = 240;
 // PW 1.0 keeps the temporal slider plot at a fixed height and compresses
 // additional interactions into that domain instead of growing a scroll area.
 const TEMPORAL_SLIDER_HEIGHT = 250;
+// PW 1.0 gives Input Text a full vertical interaction axis and condenses
+// longer histories into it instead of introducing an inner scrollbar.
+const INPUT_TEXT_TEMPORAL_HEIGHT = 440;
 
 const TemporalBrush = ({
     mode,
@@ -697,15 +700,31 @@ const Chart = ({
             TEMPORAL_BRUSH_HEIGHT
         );
         const inputTextEntries = chartData.inputTextEntries ?? [];
-        const inputTextPlotHeight = Math.max(
-            48,
-            inputTextEntries.length * 32
-        );
+        const inputTextPlotHeight = INPUT_TEXT_TEMPORAL_HEIGHT;
         const inputTextYPositions = getTemporalYPositions(
             inputTextEntries,
-            chartData.mode ?? mode,
+            "interaction",
             inputTextPlotHeight
         );
+        const inputTextSequenceMax = Math.max(
+            0,
+            inputTextEntries.length - 1
+        );
+        const inputTextTicks = inputTextSequenceMax === 0
+            ? [0]
+            : d3.ticks(0, inputTextSequenceMax, 10);
+        const inputTextTickFormat = inputTextSequenceMax === 0
+            ? () => "0"
+            : d3.tickFormat(0, inputTextSequenceMax, 10);
+        const getInputTextTickY = value => {
+            if (inputTextSequenceMax === 0) {
+                return inputTextPlotHeight / 2;
+            }
+            return 8 + (
+                (value / inputTextSequenceMax) *
+                (inputTextPlotHeight - 16)
+            );
+        };
         
         // Calculate max index from data if domain is missing or to ensure bounds
         let calculatedMax = 0;
@@ -803,15 +822,15 @@ const Chart = ({
                 style={{
                     display: "flex",
                     alignItems: "stretch",
-                    maxHeight: "300px",
-                    overflowY: "auto",
+                    height: `${inputTextPlotHeight}px`,
+                    overflow: "visible",
                 }}
             >
                 <div
                     style={{
                         position: "relative",
                         flex: "0 0 48px",
-                        minHeight: `${inputTextPlotHeight}px`,
+                        height: `${inputTextPlotHeight}px`,
                         color: "#6c757d",
                     }}
                 >
@@ -826,37 +845,55 @@ const Chart = ({
                             textAlign: "center",
                         }}
                     >
-                        {(chartData.mode ?? mode) === "time"
-                            ? "time"
-                            : "Sequence of Interactions"}
+                        Sequence of Interaction (0 = first)
                     </div>
-                    <span
+                    <svg
+                        aria-hidden="true"
+                        width="60"
+                        height={inputTextPlotHeight}
                         style={{
                             position: "absolute",
-                            right: 0,
-                            top: 0,
-                            fontSize: "10px",
+                            inset: "0 auto 0 0",
+                            overflow: "visible",
+                            pointerEvents: "none",
                         }}
                     >
-                        {(chartData.mode ?? mode) === "time"
-                            ? "t=0"
-                            : "0"}
-                    </span>
-                    <span
-                        style={{
-                            position: "absolute",
-                            right: 0,
-                            bottom: 0,
-                            fontSize: "10px",
-                        }}
-                    >
-                        {(chartData.mode ?? mode) === "time"
-                            ? "now"
-                            : Math.max(
-                                0,
-                                inputTextEntries.length - 1
-                            )}
-                    </span>
+                        <line
+                            x1="60"
+                            x2="60"
+                            y1="8"
+                            y2={inputTextPlotHeight - 8}
+                            stroke="#495057"
+                            strokeWidth="1"
+                        />
+                        {inputTextTicks.map(value => (
+                            <g
+                                key={value}
+                                transform={
+                                    `translate(0 ${getInputTextTickY(value)})`
+                                }
+                            >
+                                <line
+                                    x1="52"
+                                    x2="60"
+                                    y1="0"
+                                    y2="0"
+                                    stroke="#495057"
+                                    strokeWidth="1"
+                                />
+                                <text
+                                    x="48"
+                                    y="0"
+                                    dy="0.32em"
+                                    fill="#495057"
+                                    fontSize="10"
+                                    textAnchor="end"
+                                >
+                                    {inputTextTickFormat(value)}
+                                </text>
+                            </g>
+                        ))}
+                    </svg>
                 </div>
                 <div
                     style={{
@@ -866,35 +903,6 @@ const Chart = ({
                         height: `${inputTextPlotHeight}px`,
                     }}
                 >
-                    <svg
-                        aria-hidden="true"
-                        width="24"
-                        height={inputTextPlotHeight}
-                        style={{
-                            position: "absolute",
-                            inset: "0 auto 0 0",
-                            overflow: "visible",
-                            pointerEvents: "none",
-                        }}
-                    >
-                        {inputTextYPositions
-                            .slice(0, -1)
-                            .map((position, index) => (
-                                <line
-                                    key={index}
-                                    x1="12"
-                                    x2="12"
-                                    y1={position}
-                                    y2={
-                                        inputTextYPositions[
-                                            index + 1
-                                        ]
-                                    }
-                                    stroke="#495057"
-                                    strokeWidth="2"
-                                />
-                            ))}
-                    </svg>
                     {inputTextEntries.map(([, records], index) => {
                         const record = records[0];
                         const value = record.value;
