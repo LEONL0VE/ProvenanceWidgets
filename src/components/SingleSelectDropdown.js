@@ -288,6 +288,7 @@ const SingleSelectDropdown = (props) => {
     const [brushRange, setBrushRange] = useState([0, 100]);
     const elementRef = useRef(null);
     const dropdownRef = useRef(null);
+    const reopenAfterSelectionRef = useRef(false);
     const propsRef = useRef(props);
     const optionsRef = useRef(options);
     const configRef = useRef(config);
@@ -521,6 +522,7 @@ const SingleSelectDropdown = (props) => {
             if (open) {
                 dropdownRef.current?.show?.();
             } else {
+                reopenAfterSelectionRef.current = false;
                 dropdownRef.current?.hide?.();
             }
         };
@@ -540,6 +542,9 @@ const SingleSelectDropdown = (props) => {
     }, [revertedValue, applyRegisteredValue]);
 
     const handleChange = event => {
+        if (showTimeline) {
+            reopenAfterSelectionRef.current = true;
+        }
         const nextSelection = resolveSingleSelectOption(
             options,
             event.value,
@@ -639,6 +644,10 @@ const SingleSelectDropdown = (props) => {
                     flex-grow: 1;
                     min-width: 0;
                 }
+                .${safePanelClass} .p-dropdown-item.p-highlight,
+                .${safePanelClass} .p-dropdown-item.p-focus {
+                    background: transparent !important;
+                }
             `}</style>
             <Dropdown_
                 {...primeProps}
@@ -663,6 +672,18 @@ const SingleSelectDropdown = (props) => {
                 onHide={event => {
                     primeProps.onHide?.(event);
                     dropdownProps.onHide?.(event);
+                    if (
+                        showTimeline &&
+                        reopenAfterSelectionRef.current
+                    ) {
+                        reopenAfterSelectionRef.current = false;
+                        setTimeout(
+                            () => dropdownRef.current?.show?.(),
+                            0
+                        );
+                        return;
+                    }
+                    reopenAfterSelectionRef.current = false;
                     if (showTimeline) {
                         window.dispatchEvent(new CustomEvent(
                             "provenance-dropdown-visibility",

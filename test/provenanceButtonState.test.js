@@ -60,10 +60,9 @@ test("clicking a Temporal point is inside the footprint interaction boundary", (
                 : null,
     };
     const point = {
-        closest: selector =>
-            selector === "[data-provenance-chart-target]"
-                ? chart
-                : null,
+        closest: selector => selector.includes(
+            "[data-provenance-chart-target]"
+        ) ? chart : null,
     };
 
     assert.equal(isInsideProvenanceInteraction({
@@ -76,4 +75,37 @@ test("clicking a Temporal point is inside the footprint interaction boundary", (
         buttonElement: { contains: () => false },
         target: "another-widget",
     }), false);
+});
+
+test("interacting with the same widget keeps its footprint open", () => {
+    const widget = {
+        getAttribute: name => name === "data-widget-id"
+            ? "range-slider"
+            : null,
+    };
+    const handle = {
+        closest: selector => selector.includes("[data-widget-id]")
+            ? widget
+            : null,
+    };
+
+    assert.equal(isInsideProvenanceInteraction({
+        eventTarget: handle,
+        buttonElement: { contains: () => false },
+        target: "range-slider",
+    }), true);
+});
+
+test("interacting with a matching dropdown panel keeps its footprint open", () => {
+    const option = {
+        closest: selector => selector.includes(
+            ".provenance-multiselect-panel-multi-select"
+        ) ? {} : null,
+    };
+
+    assert.equal(isInsideProvenanceInteraction({
+        eventTarget: option,
+        buttonElement: { contains: () => false },
+        target: "multi select",
+    }), true);
 });

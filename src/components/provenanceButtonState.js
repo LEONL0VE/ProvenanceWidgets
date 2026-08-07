@@ -38,10 +38,25 @@ export const isInsideProvenanceInteraction = ({
     target,
 }) => {
     if (buttonElement?.contains?.(eventTarget)) return true;
-    const chart = eventTarget?.closest?.(
-        "[data-provenance-chart-target]"
+    const interaction = eventTarget?.closest?.(
+        "[data-provenance-chart-target], " +
+        "[data-widget-id], [data-provenance-widget]"
     );
-    return (
-        chart?.getAttribute?.("data-provenance-chart-target") === target
+    if (
+        interaction?.getAttribute?.(
+            "data-provenance-chart-target"
+        ) === target ||
+        interaction?.getAttribute?.("data-widget-id") === target ||
+        interaction?.getAttribute?.("id") === target
+    ) {
+        return true;
+    }
+
+    const safeTarget = String(target ?? "")
+        .replace(/[^a-zA-Z0-9_-]/g, "-");
+    const dropdownPanel = eventTarget?.closest?.(
+        `.provenance-dropdown-panel-${safeTarget}, ` +
+        `.provenance-multiselect-panel-${safeTarget}`
     );
+    return Boolean(dropdownPanel);
 };

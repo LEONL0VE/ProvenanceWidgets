@@ -663,6 +663,10 @@ const MultiSelectDropdown = (props) => {
                     flex-grow: 1;
                     min-width: 0;
                 }
+                .${safePanelClass} .p-multiselect-item.p-highlight,
+                .${safePanelClass} .p-multiselect-item.p-focus {
+                    background: transparent !important;
+                }
             `}</style>
             <MultiSelect_
                 {...primeProps}

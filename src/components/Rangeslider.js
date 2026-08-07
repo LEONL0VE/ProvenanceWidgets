@@ -318,6 +318,7 @@ const Rangeslider = (props) => {
         <div
             ref={setContainerRef}
             data-label={tooltipLabel}
+            data-widget-id={props.id}
             style={{
                 marginTop: "1rem",
                 width: "100%",

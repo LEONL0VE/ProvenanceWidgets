@@ -595,6 +595,7 @@ const CheckboxGroup = (props) => {
                 aria-label={
                     groupProps["aria-label"] ?? tooltipLabel
                 }
+                data-widget-id={id}
                 data-provenance-widget="checkbox-group"
                 data-provenance-open={
                     showTimeline ? "true" : undefined
