@@ -363,6 +363,9 @@ const InputText = (props) => {
                 aria-label={
                     props["aria-label"] ?? tooltipLabel
                 }
+                autoComplete={
+                    props.inputProps?.autoComplete ?? "off"
+                }
                 placeholder={placeholder}
                 onKeyUp={handleKeyUp}
                 onChange={handleInputChange}
@@ -374,6 +377,10 @@ const InputText = (props) => {
                 value={text}
                 style={{
                     width: "100%",
+                    backgroundColor: "#fff",
+                    borderColor: "#ced4da",
+                    boxShadow: "0 0 0 1000px #fff inset",
+                    outline: "none",
                     ...props.inputProps?.style,
                 }}
             />
