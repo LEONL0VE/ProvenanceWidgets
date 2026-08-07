@@ -272,13 +272,10 @@ const InputText = (props) => {
                 getScentColor(
                     value,
                     strategy,
-                    interpolateOranges,
-                    provenanceMode === "time"
-                        ? "time"
-                        : "index"
+                    interpolateOranges
                 ) || "#f4bd88",
         }));
-    }, [strategy, text, historyVersion, provenanceMode]);
+    }, [strategy, text, historyVersion]);
 
     const commitValue = (
         value,
