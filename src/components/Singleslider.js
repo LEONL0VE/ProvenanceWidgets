@@ -7,7 +7,6 @@ import {
     useState,
 } from "react";
 import { interpolateOranges } from "d3";
-import Bars from "scents";
 import NumericProvenance from "../strategies/provenance/NumericProvenance.ts";
 import { UNILATERAL_GUIDANCE_EVENT_NAME } from "../constants.ts";
 import useProvenanceController from "./hooks/useProvenanceController.js";
@@ -19,6 +18,7 @@ import { generateRange } from "./utils.js";
 import Chart from "./Chart.js";
 import SliderTickMarks from "./SliderTickMarks.js";
 import { shouldCommitSingleSliderChange } from "./singleSliderInteraction.js";
+import SingleSliderBars from "./SingleSliderBars.js";
 import {
     formatAggregateTooltip,
     getTooltipAnchorProps,
@@ -316,18 +316,14 @@ const Singleslider = (props) => {
                                 pointerEvents: "none",
                             }}
                         >
-                            <Bars
+                            <SingleSliderBars
                                 guidance={strategy}
                                 orientationScheme={interpolateOranges}
                                 barKeys={barKeys}
-                                encodings={{
-                                    orientation: "vertical",
-                                    positionDomain: "count",
-                                    colorDomain: "index",
-                                }}
+                                min={min}
+                                max={max}
                                 width={containerWidth}
                                 height={50}
-                                layout="slider"
                                 barWidthFactor={0.25}
                             />
                         </div>
@@ -338,9 +334,26 @@ const Singleslider = (props) => {
                                 pointerEvents: "none",
                             }}
                         >
-                            {barKeys.map((key, index) => {
+                            {barKeys.map(key => {
                                 const record = strategy.aggregateData?.get(key);
                                 if (!record) return null;
+                                const centerPercent = max === min
+                                    ? 50
+                                    : (
+                                        (Number(key) - min) /
+                                        (max - min)
+                                    ) * 100;
+                                const halfSlotPercent = barKeys.length > 1
+                                    ? 50 / (barKeys.length - 1)
+                                    : 50;
+                                const hitLeft = Math.max(
+                                    0,
+                                    centerPercent - halfSlotPercent
+                                );
+                                const hitRight = Math.min(
+                                    100,
+                                    centerPercent + halfSlotPercent
+                                );
 
                                 const tooltipProps = getTooltipAnchorProps(
                                     tooltip,
@@ -389,10 +402,8 @@ const Singleslider = (props) => {
                                         style={{
                                             ...tooltipProps.style,
                                             position: "absolute",
-                                            left:
-                                                `${(index / barKeys.length) * 100}%`,
-                                            width:
-                                                `${100 / barKeys.length}%`,
+                                            left: `${hitLeft}%`,
+                                            width: `${hitRight - hitLeft}%`,
                                             top: 0,
                                             bottom: 0,
                                             background: "transparent",
