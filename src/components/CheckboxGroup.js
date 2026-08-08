@@ -8,8 +8,10 @@ import {
     useState,
 } from "react";
 import { Slider as Slider_ } from "primereact/slider/slider.esm.js";
-import SelectionProvenance from "../strategies/provenance/SelectionProvenance.ts";
-import { UNILATERAL_GUIDANCE_EVENT_NAME } from "../constants.ts";
+import {
+    SelectionProvenance,
+    UNILATERAL_GUIDANCE_EVENT_NAME,
+} from "@provenance-widgets/core";
 import useProvenanceController from "./hooks/useProvenanceController.js";
 import useRevertedValue from "./hooks/useRevertedValue.js";
 import useWidgetRegistry from "./hooks/useWidgetRegistry.js";

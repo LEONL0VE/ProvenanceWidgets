@@ -1,4 +1,4 @@
-import { UNILATERAL_GUIDANCE_EVENT_NAME } from '../../constants.ts';
+import { UNILATERAL_GUIDANCE_EVENT_NAME } from '@provenance-widgets/core';
 import { useEffect, useState } from "react";
 
 export default function useGuidanceSymbol(guidance) {

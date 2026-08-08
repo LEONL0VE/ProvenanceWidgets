@@ -12,7 +12,7 @@ import {
     normalizeWidgetRegistration,
     registerWidgetInMap,
     unregisterWidgetFromMap,
-} from '../../controllers/widgetRegistry.js';
+} from '@provenance-widgets/core';
 import ProvenanceContext from '../contexts/provenance.js';
 
 const ProvenanceProvider = ({ children }) => {

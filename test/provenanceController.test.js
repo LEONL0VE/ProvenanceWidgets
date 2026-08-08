@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import ProvenanceController from "../src/controllers/ProvenanceController.js";
+import { ProvenanceController } from "@provenance-widgets/core";
 
 const createStrategy = () => {
     const inserts = [];

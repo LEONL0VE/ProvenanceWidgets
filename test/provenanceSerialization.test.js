@@ -4,7 +4,7 @@ import {
     cloneProvenanceValue,
     normalizeSerializedProvenance,
     provenanceValuesEqual,
-} from "../src/controllers/provenanceSerialization.js";
+} from "@provenance-widgets/core";
 
 const options = {
     widgetId: "price",

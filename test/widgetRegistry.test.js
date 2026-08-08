@@ -5,7 +5,7 @@ import {
     normalizeWidgetRegistration,
     registerWidgetInMap,
     unregisterWidgetFromMap,
-} from "../src/controllers/widgetRegistry.js";
+} from "@provenance-widgets/core";
 
 const createRegistration = (overrides = {}) => ({
     id: "price",

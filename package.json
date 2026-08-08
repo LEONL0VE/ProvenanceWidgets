@@ -24,12 +24,11 @@
     "react-dom": "^19.2.0"
   },
   "dependencies": {
-    "@mantine/core": "^8.3.7",
+    "@provenance-widgets/core": "github:ProvenanceWidgets/core#semver:^1.0.0",
     "d3": "^7.9.0",
     "d3-color": "^3.1.0",
     "primereact": "^10.9.7",
-    "react-tooltip": "^5.30.0",
-    "tstl": "^3.0.0"
+    "react-tooltip": "^5.30.0"
   },
   "scripts": {
     "test": "node --test",

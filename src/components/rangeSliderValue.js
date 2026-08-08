@@ -1,4 +1,4 @@
-import { provenanceValuesEqual } from "../controllers/provenanceSerialization.js";
+import { provenanceValuesEqual } from "@provenance-widgets/core";
 
 const clamp = (value, min, max) =>
     Math.min(max, Math.max(min, value));

@@ -283,7 +283,7 @@ const Chart = ({
         // Check if this is TextProvenance (Input Text)
         // TextProvenance extends SuperProvenance? No, it extends GenericProvenance usually, or SuperProvenance based on search results.
         // Wait, TextProvenance.js in example shows `class TextProvenance extends SuperProvenance`.
-        // But `src/strategies/provenance/TextProvenance.ts` usually extends GenericProvenance<string>.
+        // TextProvenance from core extends GenericProvenance<string>.
         // Let's check detailedData structure.
         // For TextProvenance, detailedData is typically Map<index, {value, time, index}> like NumericProvenance?
         // OR does it track history of strings?

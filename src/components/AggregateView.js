@@ -5,7 +5,7 @@ import Chart from "./Chart.js"
 import useProvenance from './hooks/useProvenance.js';
 import useWidgetColors from './hooks/useWidgetColors.js';
 import useWidgetRegistry from './hooks/useWidgetRegistry.js';
-import { getRegistrationElement } from '../controllers/widgetRegistry.js';
+import { getRegistrationElement } from '@provenance-widgets/core';
 import { scaleOrdinal } from 'd3-scale';
 import { schemeCategory10 } from 'd3-scale-chromatic';
 import {

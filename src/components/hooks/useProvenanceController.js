@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
-import ProvenanceController from "../../controllers/ProvenanceController.js";
+import { ProvenanceController } from "@provenance-widgets/core";
 
 /**
  * React lifecycle wrapper around the framework-independent controller.

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import SuperProvenance_, {
+import {
+    SuperProvenance as SuperProvenance_,
     WidgetType,
-} from '../strategies/provenance/SuperProvenance.ts';
-import { UNILATERAL_GUIDANCE_EVENT_NAME } from '../constants.ts';
+    UNILATERAL_GUIDANCE_EVENT_NAME,
+} from '@provenance-widgets/core';
 import useProvenance from './hooks/useProvenance.js';
 import useWidgetRegistry from './hooks/useWidgetRegistry.js';
 import Internal_ProvenanceButton from './Internal_ProvenanceButton.js';

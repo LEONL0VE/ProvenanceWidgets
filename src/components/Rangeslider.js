@@ -7,8 +7,10 @@ import {
     useState,
 } from "react";
 import { interpolateOranges } from "d3";
-import RangedProvenance from "../strategies/provenance/RangedProvenance.ts";
-import { UNILATERAL_GUIDANCE_EVENT_NAME } from "../constants.ts";
+import {
+    RangedProvenance,
+    UNILATERAL_GUIDANCE_EVENT_NAME,
+} from "@provenance-widgets/core";
 import useProvenanceController from "./hooks/useProvenanceController.js";
 import useRevertedValue from "./hooks/useRevertedValue.js";
 import useWidgetRegistry from "./hooks/useWidgetRegistry.js";

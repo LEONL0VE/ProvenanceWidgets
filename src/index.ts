@@ -1,8 +1,4 @@
-export * from "./utils";
-export * from "./Guidance";
-export * from "./strategies";
-export * from "./constants";
-export * from "./controllers/index.js";
+export * from "@provenance-widgets/core";
 
 export type {
   CommonProvenanceWidgetProps,
@@ -19,7 +15,7 @@ export type {
   WidgetRegistration,
 } from "./types/provenance";
 
-export { default as Guidance } from "./Guidance";
+export { default as Guidance } from "@provenance-widgets/core";
 
 
 

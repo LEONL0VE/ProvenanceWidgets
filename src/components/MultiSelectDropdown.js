@@ -9,8 +9,10 @@ import {
 } from "react";
 import { interpolateOranges } from "d3";
 import Bars from "./Bars.js";
-import SelectionProvenance from "../strategies/provenance/SelectionProvenance.ts";
-import { UNILATERAL_GUIDANCE_EVENT_NAME } from "../constants.ts";
+import {
+    SelectionProvenance,
+    UNILATERAL_GUIDANCE_EVENT_NAME,
+} from "@provenance-widgets/core";
 import useProvenanceController from "./hooks/useProvenanceController.js";
 import useRevertedValue from "./hooks/useRevertedValue.js";
 import useWidgetRegistry from "./hooks/useWidgetRegistry.js";
