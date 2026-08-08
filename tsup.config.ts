@@ -16,7 +16,6 @@ export default defineConfig({
   // These dependencies need to be bundled because some expose
   // source files or module paths that Node cannot load directly.
   noExternal: [
-    /^scents(?:\/.*)?$/,
     /^primereact(?:\/.*)?$/,
     /^d3(?:$|[-/].*)/,
     /^react-tooltip(?:\/.*)?$/,

@@ -29,11 +29,7 @@
     "d3-color": "^3.1.0",
     "primereact": "^10.9.7",
     "react-tooltip": "^5.30.0",
-    "scents": "github:ProvenanceWidgets/scents#839b8ee889ac5d4de875ba34db2a17ef1474624c",
     "tstl": "^3.0.0"
-  },
-  "overrides": {
-    "guidance": "github:GuidanceWidgets/guidance#59668b2282a5f6cdc42d87780380a248e7e79aa5"
   },
   "scripts": {
     "test": "node --test",

@@ -8,7 +8,7 @@ import {
     useState,
 } from "react";
 import { interpolateOranges } from "d3";
-import Bars from "scents";
+import Bars from "./Bars.js";
 import SelectionProvenance from "../strategies/provenance/SelectionProvenance.ts";
 import { UNILATERAL_GUIDANCE_EVENT_NAME } from "../constants.ts";
 import useProvenanceController from "./hooks/useProvenanceController.js";

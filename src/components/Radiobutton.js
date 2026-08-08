@@ -1,7 +1,7 @@
 import { RadioButton as RadioButton_ } from "primereact/radiobutton/radiobutton.esm.js";
 import { useEffect, useMemo } from "react";
 import { interpolateOranges } from "d3";
-import Bars from "scents";
+import Bars from "./Bars.js";
 import { useRadioGroup } from "./radioGroupContext.js";
 import useElementSize from "./hooks/useElementSize.js";
 import useProvenanceTooltip from "./hooks/useProvenanceTooltip.js";

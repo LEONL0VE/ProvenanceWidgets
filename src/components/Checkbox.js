@@ -1,7 +1,7 @@
 import { Checkbox as Checkbox_ } from "primereact/checkbox/checkbox.esm.js";
 import { useEffect, useMemo, useState } from "react";
 import { interpolateOranges } from "d3";
-import Bars from "scents";
+import Bars from "./Bars.js";
 import { useCheckboxGroup } from "./checkboxGroupContext.js";
 import useElementSize from "./hooks/useElementSize.js";
 import useProvenanceTooltip from "./hooks/useProvenanceTooltip.js";
