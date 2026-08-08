@@ -15,10 +15,6 @@ export type {
   WidgetRegistration,
 } from "./types/provenance";
 
-export { default as Guidance } from "@provenance-widgets/core";
-
-
-
 // React UI components
 export { default as AggregateView } from "./components/AggregateView.js";
 export { default as Chart } from "./components/Chart.js";
