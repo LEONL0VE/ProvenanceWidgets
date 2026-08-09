@@ -93,6 +93,7 @@ const RangeIntervalBars = props => {
 export default function Bars(props) {
     const {
         guidance,
+        orientationScheme,
         encodings: {
             orientation,
             positionDomain,
