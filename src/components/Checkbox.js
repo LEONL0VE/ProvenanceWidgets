@@ -1,5 +1,5 @@
 import { Checkbox as Checkbox_ } from "primereact/checkbox/checkbox.esm.js";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { interpolateOranges } from "d3";
 import Bars from "./Bars.js";
 import { useCheckboxGroup } from "./checkboxGroupContext.js";
@@ -10,6 +10,7 @@ import DropdownBarLabel from "./DropdownBarLabel.js";
 import {
     formatAggregateTooltip,
     getAggregateTooltipRecord,
+    getTemporalRowTooltipProps,
     getTooltipAnchorProps,
 } from "./provenanceTooltip.js";
 
@@ -58,6 +59,11 @@ const Checkbox = ({
         useState(checkedProp ?? defaultChecked);
     const [containerRef, { width: containerWidth }] =
         useElementSize();
+    const containerElementRef = useRef(null);
+    const setContainerElement = useCallback(element => {
+        containerElementRef.current = element;
+        containerRef(element);
+    }, [containerRef]);
     const tooltip = useProvenanceTooltip();
     const guidance = checkboxGroup?.guidance;
     const hasProvenance =
@@ -151,6 +157,24 @@ const Checkbox = ({
                 { focusable: false }
             )
             : {};
+    const temporalTooltipProps =
+        visualize && showTimeline && timelineData
+            ? getTemporalRowTooltipProps(tooltip, {
+                records: timelineData.records,
+                maxIndex: timelineData.maxIndex,
+                getBounds: () =>
+                    containerElementRef.current
+                        ?.getBoundingClientRect?.(),
+                label:
+                    checkboxGroup?.tooltipLabel ??
+                    checkboxGroup?.id,
+                value,
+                kind: "multi-selection",
+            })
+            : {};
+    const rowTooltipProps = showTimeline
+        ? temporalTooltipProps
+        : aggregateTooltipProps;
 
     const handleChange = event => {
         if (disabled || primeProps.readonly) return;
@@ -170,12 +194,12 @@ const Checkbox = ({
 
     return (
         <div
-            {...aggregateTooltipProps}
+            {...rowTooltipProps}
             data-provenance-chart-target={checkboxGroup?.id}
             data-provenance-option={value}
             className={containerClassName}
             style={{
-                ...aggregateTooltipProps.style,
+                ...rowTooltipProps.style,
                 ...containerStyle,
                 display: "flex",
                 alignItems: "center",
@@ -199,7 +223,7 @@ const Checkbox = ({
                 checked={checked}
             />
             <div
-                ref={containerRef}
+                ref={setContainerElement}
                 style={{
                     position: "relative",
                     flex: 1,

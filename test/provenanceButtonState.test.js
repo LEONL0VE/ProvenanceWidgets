@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
     getProvenanceButtonState,
+    getProvenanceButtonTooltip,
     hasUserProvenance,
     isInsideProvenanceInteraction,
 } from "../src/components/provenanceButtonState.js";
@@ -50,6 +51,22 @@ test("visualize=false hides the separately rendered footprint", () => {
         visualize: false,
         open: true,
     }), "hidden");
+});
+
+test("describes every visible footprint state", () => {
+    assert.deepEqual(getProvenanceButtonTooltip("disabled"), {
+        title: "No provenance yet",
+        description: "Interact with this widget to create provenance.",
+    });
+    assert.match(
+        getProvenanceButtonTooltip("aggregate").description,
+        /overall frequency/
+    );
+    assert.match(
+        getProvenanceButtonTooltip("temporal").action,
+        /restore/
+    );
+    assert.equal(getProvenanceButtonTooltip("hidden"), null);
 });
 
 test("clicking a Temporal point is inside the footprint interaction boundary", () => {

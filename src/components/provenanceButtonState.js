@@ -32,6 +32,28 @@ export const getProvenanceButtonState = ({
     return open ? "temporal" : "aggregate";
 };
 
+const provenanceButtonTooltips = {
+    disabled: {
+        title: "No provenance yet",
+        description: "Interact with this widget to create provenance.",
+    },
+    aggregate: {
+        title: "Aggregate mode",
+        description:
+            "Showing overall frequency (larger size = more) and recency " +
+            "(darker color = more) of past interactions.",
+        action: "Click to toggle.",
+    },
+    temporal: {
+        title: "Temporal mode",
+        description: "Showing when past interactions occurred.",
+        action: "Click a history mark to restore it. Click to toggle.",
+    },
+};
+
+export const getProvenanceButtonTooltip = state =>
+    provenanceButtonTooltips[state] ?? null;
+
 export const isInsideProvenanceInteraction = ({
     eventTarget,
     buttonElement,

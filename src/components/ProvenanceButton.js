@@ -7,6 +7,7 @@ import useWidgetColors from './hooks/useWidgetColors.js';
 import useWidgetRegistry from './hooks/useWidgetRegistry.js';
 import {
     getProvenanceButtonState,
+    getProvenanceButtonTooltip,
     isInsideProvenanceInteraction,
 } from './provenanceButtonState.js';
 
@@ -54,6 +55,17 @@ const ProvenanceButton = ({ target }) => {
         open: Boolean(open),
     });
     const isDisabled = buttonState === "disabled";
+    const viewTooltip = getProvenanceButtonTooltip(buttonState);
+    const safeTarget = String(target ?? "widget")
+        .replace(/[^a-zA-Z0-9_-]/g, "-");
+    const viewTooltipId = `provenance-view-tooltip-${safeTarget}`;
+    const viewTooltipLabel = viewTooltip
+        ? [
+            viewTooltip.title,
+            viewTooltip.description,
+            viewTooltip.action,
+        ].filter(Boolean).join(". ")
+        : undefined;
 
     // Check if this is a checkbox/radio group to render in-situ (Timeline)
     // We EXCLUDE single-select dropdowns from this "isSelectionGroup" logic
@@ -206,10 +218,16 @@ const ProvenanceButton = ({ target }) => {
                 }
             `}</style>
             <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                <div style={wrapperStyle}>
+                <div
+                    style={wrapperStyle}
+                    data-tooltip-id={viewTooltipId}
+                    data-tooltip-place="right"
+                    aria-label={viewTooltipLabel}
+                >
                     <Button 
                         ref={buttonRef} 
                         className="provenance-button"
+                        aria-label={`Toggle provenance view for ${target}`}
                         data-provenance-state={buttonState}
                         data-tooltip-id={(!isSelectionGroup && !isDropdown) ? "open-tooltip-" + target : undefined}
                         onClick={handleToggle} 
@@ -234,7 +252,34 @@ const ProvenanceButton = ({ target }) => {
                         )} 
                     />
                 </div>
-                
+
+                {viewTooltip && (
+                    <Tooltip
+                        id={viewTooltipId}
+                        events={['hover']}
+                        opacity={1}
+                        place="right"
+                        positionStrategy="fixed"
+                        style={{
+                            zIndex: 110,
+                            maxWidth: "370px",
+                            lineHeight: 1.45,
+                        }}
+                    >
+                        <div>
+                            <strong style={{ display: "block", marginBottom: "4px" }}>
+                                {viewTooltip.title}
+                            </strong>
+                            <div>{viewTooltip.description}</div>
+                            {viewTooltip.action && (
+                                <div style={{ marginTop: "4px" }}>
+                                    {viewTooltip.action}
+                                </div>
+                            )}
+                        </div>
+                    </Tooltip>
+                )}
+
                 {/* For selection groups, render HEADER beside the button when open */}
                 {isSelectionGroup &&
                     open &&
