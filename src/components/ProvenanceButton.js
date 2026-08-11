@@ -1,5 +1,6 @@
 import { Button } from 'primereact/button/button.esm.js';
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Tooltip } from 'react-tooltip';
 import Chart from "./Chart.js"
 import useProvenance from './hooks/useProvenance.js';
@@ -9,20 +10,22 @@ import {
     getProvenanceButtonState,
     getProvenanceButtonTooltip,
     isInsideProvenanceInteraction,
+    PROVENANCE_BUTTON_TOOLTIP_DELAY_MS,
 } from './provenanceButtonState.js';
 
-// Keep the footprint help visually consistent with PW 1.0. PrimeReact
-// overlays start around z-index 1000, while the original PW tooltip used
-// z-index 2000 so it remained readable above open dropdown panels.
-const FOOTPRINT_TOOLTIP_BACKGROUND = '#191919';
-const FOOTPRINT_TOOLTIP_Z_INDEX = 2000;
+// Match PW 1.0's PrimeNG Lara Light Blue tooltip. Rendered through a body
+// portal below so application overflow and stacking contexts cannot clip it.
+const FOOTPRINT_TOOLTIP_BACKGROUND = '#495057';
+const FOOTPRINT_TOOLTIP_Z_INDEX = 4000;
 const footprintTooltipStyle = {
     zIndex: FOOTPRINT_TOOLTIP_Z_INDEX,
-    maxWidth: 'min(370px, calc(100vw - 32px))',
-    borderRadius: '5px',
+    width: 'max-content',
+    maxWidth: 'min(335px, calc(100vw - 24px))',
+    padding: '0.75rem',
+    borderRadius: '6px',
     backgroundColor: FOOTPRINT_TOOLTIP_BACKGROUND,
     color: '#fff',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.35)',
+    boxShadow: '0 2px 12px 0 rgba(0, 0, 0, 0.1)',
     fontSize: '14px',
     lineHeight: 1.45,
 };
@@ -238,6 +241,9 @@ const ProvenanceButton = ({ target }) => {
                     style={wrapperStyle}
                     data-tooltip-id={viewTooltipId}
                     data-tooltip-place="right"
+                    data-tooltip-delay-show={
+                        PROVENANCE_BUTTON_TOOLTIP_DELAY_MS
+                    }
                     aria-label={viewTooltipLabel}
                 >
                     <Button 
@@ -269,29 +275,39 @@ const ProvenanceButton = ({ target }) => {
                     />
                 </div>
 
-                {viewTooltip && (
-                    <Tooltip
-                        id={viewTooltipId}
-                        events={['hover']}
-                        opacity={1}
-                        place="right"
-                        positionStrategy="fixed"
-                        arrowColor={FOOTPRINT_TOOLTIP_BACKGROUND}
-                        style={footprintTooltipStyle}
-                    >
-                        <div>
-                            <strong style={{ display: "block", marginBottom: "4px" }}>
-                                {viewTooltip.title}
-                            </strong>
-                            <div>{viewTooltip.description}</div>
-                            {viewTooltip.action && (
-                                <div style={{ marginTop: "4px" }}>
-                                    {viewTooltip.action}
-                                </div>
-                            )}
-                        </div>
-                    </Tooltip>
-                )}
+                {viewTooltip && typeof document !== 'undefined' &&
+                    createPortal(
+                        <Tooltip
+                            id={viewTooltipId}
+                            events={['hover']}
+                            delayShow={PROVENANCE_BUTTON_TOOLTIP_DELAY_MS}
+                            delayHide={0}
+                            opacity={1}
+                            place="right"
+                            positionStrategy="fixed"
+                            arrowColor={FOOTPRINT_TOOLTIP_BACKGROUND}
+                            closeOnEsc
+                            style={footprintTooltipStyle}
+                        >
+                            <div>
+                                <strong
+                                    style={{
+                                        display: "block",
+                                        marginBottom: "4px",
+                                    }}
+                                >
+                                    {viewTooltip.title}
+                                </strong>
+                                <div>{viewTooltip.description}</div>
+                                {viewTooltip.action && (
+                                    <div style={{ marginTop: "4px" }}>
+                                        {viewTooltip.action}
+                                    </div>
+                                )}
+                            </div>
+                        </Tooltip>,
+                        document.body
+                    )}
 
                 {/* For selection groups, render HEADER beside the button when open */}
                 {isSelectionGroup &&

@@ -5,6 +5,7 @@ import {
     getProvenanceButtonTooltip,
     hasUserProvenance,
     isInsideProvenanceInteraction,
+    PROVENANCE_BUTTON_TOOLTIP_DELAY_MS,
 } from "../src/components/provenanceButtonState.js";
 
 const provenance = ({
@@ -55,18 +56,28 @@ test("visualize=false hides the separately rendered footprint", () => {
 
 test("describes every visible footprint state", () => {
     assert.deepEqual(getProvenanceButtonTooltip("disabled"), {
-        title: "No provenance yet",
-        description: "Interact with this widget to create provenance.",
+        title: "No provenance yet.",
+        description: "Interact with the widget to generate/see provenance.",
     });
-    assert.match(
-        getProvenanceButtonTooltip("aggregate").description,
-        /overall frequency/
-    );
-    assert.match(
-        getProvenanceButtonTooltip("temporal").action,
-        /restore/
-    );
+    assert.deepEqual(getProvenanceButtonTooltip("aggregate"), {
+        title: "Aggregate mode",
+        description:
+            "Showing overall frequency (larger size = more) and recency " +
+            "(darker color = more) of past interactions.",
+        action: "Click to toggle.",
+    });
+    assert.deepEqual(getProvenanceButtonTooltip("temporal"), {
+        title: "Temporal mode",
+        description:
+            "Showing individual past interactions over the selected " +
+            "time period.",
+        action: "Click to toggle.",
+    });
     assert.equal(getProvenanceButtonTooltip("hidden"), null);
+});
+
+test("matches PW 1.0's delayed footprint help", () => {
+    assert.equal(PROVENANCE_BUTTON_TOOLTIP_DELAY_MS, 500);
 });
 
 test("clicking a Temporal point is inside the footprint interaction boundary", () => {

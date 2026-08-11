@@ -34,8 +34,9 @@ export const getProvenanceButtonState = ({
 
 const provenanceButtonTooltips = {
     disabled: {
-        title: "No provenance yet",
-        description: "Interact with this widget to create provenance.",
+        title: "No provenance yet.",
+        description:
+            "Interact with the widget to generate/see provenance.",
     },
     aggregate: {
         title: "Aggregate mode",
@@ -46,10 +47,16 @@ const provenanceButtonTooltips = {
     },
     temporal: {
         title: "Temporal mode",
-        description: "Showing when past interactions occurred.",
-        action: "Click a history mark to restore it. Click to toggle.",
+        description:
+            "Showing individual past interactions over the selected " +
+            "time period.",
+        action: "Click to toggle.",
     },
 };
+
+// PW 1.0's PrimeNG tooltip uses showDelay: 500. Keep the same interaction
+// timing in SW so a footprint tooltip only appears after an intentional hover.
+export const PROVENANCE_BUTTON_TOOLTIP_DELAY_MS = 500;
 
 export const getProvenanceButtonTooltip = state =>
     provenanceButtonTooltips[state] ?? null;
