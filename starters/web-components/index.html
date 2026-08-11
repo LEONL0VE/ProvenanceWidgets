@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SW Web Components Starter</title>
+  </head>
+  <body>
+    <main>
+      <h1>SuperProvenanceWidgets</h1>
+      <p>
+        Change the selection, then use the footprint to switch between
+        Aggregate and Temporal provenance views.
+      </p>
+
+      <section class="example" aria-labelledby="checkbox-heading">
+        <h2 id="checkbox-heading">Checkbox</h2>
+        <web-provenance-checkbox
+          id="starter-checkbox"
+          name="starter-checkbox"
+          data-label="Food"
+          visualize="true"
+        ></web-provenance-checkbox>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
