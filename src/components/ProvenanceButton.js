@@ -11,6 +11,22 @@ import {
     isInsideProvenanceInteraction,
 } from './provenanceButtonState.js';
 
+// Keep the footprint help visually consistent with PW 1.0. PrimeReact
+// overlays start around z-index 1000, while the original PW tooltip used
+// z-index 2000 so it remained readable above open dropdown panels.
+const FOOTPRINT_TOOLTIP_BACKGROUND = '#191919';
+const FOOTPRINT_TOOLTIP_Z_INDEX = 2000;
+const footprintTooltipStyle = {
+    zIndex: FOOTPRINT_TOOLTIP_Z_INDEX,
+    maxWidth: 'min(370px, calc(100vw - 32px))',
+    borderRadius: '5px',
+    backgroundColor: FOOTPRINT_TOOLTIP_BACKGROUND,
+    color: '#fff',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.35)',
+    fontSize: '14px',
+    lineHeight: 1.45,
+};
+
 const ProvenanceButton = ({ target }) => {
     const [open, setOpen] = useState()
     const [registeredComponents, setRegisteredComponents] = useProvenance()
@@ -260,11 +276,8 @@ const ProvenanceButton = ({ target }) => {
                         opacity={1}
                         place="right"
                         positionStrategy="fixed"
-                        style={{
-                            zIndex: 110,
-                            maxWidth: "370px",
-                            lineHeight: 1.45,
-                        }}
+                        arrowColor={FOOTPRINT_TOOLTIP_BACKGROUND}
+                        style={footprintTooltipStyle}
                     >
                         <div>
                             <strong style={{ display: "block", marginBottom: "4px" }}>
