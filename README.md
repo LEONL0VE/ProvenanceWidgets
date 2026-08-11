@@ -1,16 +1,13 @@
 # ProvenanceWidgets
 
-[![DOI:10.1145/3772363.3798409](https://zenodo.org/badge/DOI/10.1145/3772363.3798409.svg)](https://doi.org/10.1145/3772363.3798409)
-[![arXiv badge](https://img.shields.io/badge/arXiv-2604.15342-red)](https://arxiv.org/abs/2604.15342)
-[![DOI:10.1109/TVCG.2024.3456144](https://zenodo.org/badge/DOI/10.1109/TVCG.2024.3456144.svg)](https://doi.org/10.1109/TVCG.2024.3456144)
-[![arXiv badge](https://img.shields.io/badge/arXiv-2407.17431-red)](https://arxiv.org/abs/2407.17431)
-[![NPM - Downloads](https://img.shields.io/npm/dm/provenance-widgets)](https://www.npmjs.com/package/provenance-widgets)
 
 A JavaScript library of GUI Controls for Tracking and Dynamically Overlaying Analytic Provenance.
 
 ### Read and cite our papers
 
 #### SuperProvenanceWidgets, published at the 2026 ACM CHI Conference
+[![DOI:10.1145/3772363.3798409](https://zenodo.org/badge/DOI/10.1145/3772363.3798409.svg)](https://doi.org/10.1145/3772363.3798409)
+[![arXiv badge](https://img.shields.io/badge/arXiv-2604.15342-red)](https://arxiv.org/abs/2604.15342)
 
 ```bibTeX
 @inproceedings{verma2026superprovenancewidgets,
@@ -25,6 +22,9 @@ A JavaScript library of GUI Controls for Tracking and Dynamically Overlaying Ana
 ```
 
 #### ProvenanceWidgets, published at the 2024 IEEE VIS Conference
+[![DOI:10.1109/TVCG.2024.3456144](https://zenodo.org/badge/DOI/10.1109/TVCG.2024.3456144.svg)](https://doi.org/10.1109/TVCG.2024.3456144)
+[![arXiv badge](https://img.shields.io/badge/arXiv-2407.17431-red)](https://arxiv.org/abs/2407.17431)
+[![NPM - Downloads](https://img.shields.io/npm/dm/provenance-widgets)](https://www.npmjs.com/package/provenance-widgets)
 
 ```bibTeX
 @article{narechania2024provenancewidgets,
