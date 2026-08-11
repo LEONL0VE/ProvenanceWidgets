@@ -4,13 +4,23 @@
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./web-components": "./dist/web-components/index.js",
-    "./web-components/index.js": "./dist/web-components/index.js",
+    "./web-components": {
+      "types": "./dist/web-components/index.d.ts",
+      "import": "./dist/web-components/index.js",
+      "default": "./dist/web-components/index.js"
+    },
+    "./web-components/index.js": {
+      "types": "./dist/web-components/index.d.ts",
+      "import": "./dist/web-components/index.js",
+      "default": "./dist/web-components/index.js"
+    },
     "./web-components/styles.css": "./dist/web-components/styles.css"
   },
   "files": [
@@ -32,6 +42,8 @@
   },
   "scripts": {
     "test": "node --test",
+    "typecheck": "tsc --noEmit",
+    "test:types": "tsc --project test/types/tsconfig.json",
     "build": "npm run build:library && npm run build:web-components",
     "build:library": "tsup",
     "build:web-components": "tsup --config tsup.web-components.config.ts && node scripts/prepare-web-components.mjs",
@@ -39,7 +51,9 @@
     "prepare": "npm run build"
   },
   "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
     "tsup": "^8.5.1",
-    "typescript": "^7.0.2"
+    "typescript": "5.6.2"
   }
 }

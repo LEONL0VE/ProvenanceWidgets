@@ -16,9 +16,15 @@ const generatedScript = new URL(
     outputDirectory
 );
 const publicScript = new URL("index.js", outputDirectory);
+const generatedTypes = new URL(
+    "../src/web-components/public.d.ts",
+    import.meta.url
+);
+const publicTypes = new URL("index.d.ts", outputDirectory);
 
 await access(generatedScript, constants.R_OK);
 await copyFile(generatedScript, publicScript);
+await copyFile(generatedTypes, publicTypes);
 
 try {
     await rename(generatedStyles, publicStyles);

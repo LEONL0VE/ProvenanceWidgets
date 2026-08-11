@@ -4,7 +4,8 @@
       "module": "esnext",
       "strict": true,
       "esModuleInterop": true,
-      "moduleResolution": "node",
+      "moduleResolution": "Bundler",
+      "jsx": "react-jsx",
       "skipLibCheck": true,
       "noUnusedLocals": true,
       "noImplicitAny": true,
@@ -12,8 +13,12 @@
       "noEmit": true,
       "outDir": "dist",
       "resolveJsonModule": true,
-      "lib": ["ESNext", "DOM"], // Change to ES2024 when available
-      "types": ["vitest/globals"]
-    }
+      "lib": ["ESNext", "DOM"]
+    },
+    "include": [
+      "src/**/*.ts",
+      "src/**/*.tsx",
+      "tsup.config.ts",
+      "tsup.web-components.config.ts"
+    ]
   }
-  
