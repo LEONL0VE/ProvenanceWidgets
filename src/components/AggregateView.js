@@ -179,15 +179,18 @@ const AggregateView = ({ target }) => {
     };
 
     return (
-        <div style={{ 
+        <div
+            data-provenance-aggregate-view={target}
+            style={{
             display: "flex", 
             alignItems: "center", 
             marginTop: "1rem", 
             width: "400px",
             height: "45px",
-            backgroundColor: coloredBoxes.length > 0
-                ? 'transparent'
-                : '#eeeeee'
+            // Empty widget outlines initially occupy only part of the track.
+            // Keep the unused capacity visible; interacted segments already
+            // expand to the full 400px and naturally cover this background.
+            backgroundColor: '#eeeeee'
         }}>
             {coloredBoxes.map((box, index) => (
                 <div key={index}>

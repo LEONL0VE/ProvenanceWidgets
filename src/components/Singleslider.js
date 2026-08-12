@@ -26,6 +26,7 @@ import {
     getTooltipAnchorProps,
 } from "./provenanceTooltip.js";
 import { resolveTemporalBrushEnabled } from "./singleSliderTemporal.js";
+import { getSliderViewPanelLayout } from "./sliderViewLayout.js";
 
 const callValueCallbacks = (props, value, event) => {
     const callbacks = new Set([
@@ -113,6 +114,10 @@ const Singleslider = (props) => {
     // It follows intermediate onChange steps, while currentValue (from the
     // controller) only updates when provenance is actually committed.
     const [displayValue, setDisplayValue] = useState(currentValue);
+    const viewPanelLayout = getSliderViewPanelLayout({
+        temporalBrush,
+        entryCount: strategy?.detailedData?.size ?? 0,
+    });
     const currentValueRef = useRef(currentValue);
     currentValueRef.current = currentValue;
     const serializedProvenanceRef = useRef(serializedProvenance);
@@ -453,12 +458,14 @@ const Singleslider = (props) => {
 
             {visualize && isDropdownVisible && (
                 <div
-                    style={{
-                        position: "absolute",
-                        top: "100%",
-                        left: 0,
-                        width: "100%",
-                        border: "1px solid #ccc",
+                     style={{
+                         position: "absolute",
+                         top: "100%",
+                         left: `${viewPanelLayout.panelOffset}px`,
+                         width:
+                             `calc(100% + ${viewPanelLayout.panelExtraWidth}px)`,
+                         border: "1px solid #ccc",
+                         boxSizing: "border-box",
                         backgroundColor: "#fff",
                         zIndex: 1000,
                         borderRadius: "4px",

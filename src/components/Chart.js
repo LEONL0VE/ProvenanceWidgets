@@ -700,7 +700,9 @@ const Chart = ({
             const leftLabelWidth = hasLeftAxisLabel
                 ? brushEnabled ? brushWidth : 28
                 : 0;
-            const leftLabelGap = hasLeftAxisLabel ? 8 : 0;
+            // TemporalBrush already occupies the complete body gutter. The
+            // compact vertical label is the only variant with an 8px gap.
+            const leftLabelGap = hasLeftAxisLabel && !brushEnabled ? 8 : 0;
             const plotInset = hasLeftAxisLabel ? 6 : 0;
             const totalLeftGutter = leftLabelWidth + leftLabelGap + plotInset;
             const totalRightInset = plotInset;
@@ -714,7 +716,7 @@ const Chart = ({
                 >
                     <div data-timeline-axis={target} style={{ width: innerWidthCalc, marginLeft: innerMarginLeft, height: '4px', background: axisColor, borderRadius: '2px', position: 'relative' }}></div>
                     <div style={{ width: innerWidthCalc, marginLeft: innerMarginLeft, display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-                        <span style={{ fontSize: '12px', color: labelColor, fontWeight: 'bold' }}>
+                        <span style={{ fontSize: '12px', color: labelColor, fontWeight: 'bold', transform: hasLeftAxisLabel ? 'translateX(-50%)' : undefined }}>
                            {chartData.isInputText &&
                            (chartData.mode ?? mode) === "time"
                                ? "t=0"
@@ -725,7 +727,7 @@ const Chart = ({
                                    ? minIndex
                                    : "n=0"}
                         </span>
-                        <span style={{ fontSize: '12px', color: labelColor, fontWeight: 'bold' }}>
+                        <span style={{ fontSize: '12px', color: labelColor, fontWeight: 'bold', transform: hasLeftAxisLabel ? 'translateX(50%)' : undefined }}>
                            {chartData.isRangeSlider ||
                            chartData.isSingleSlider
                                ? maxIndex
@@ -1339,7 +1341,7 @@ const Chart = ({
             return (
                 <div
                     data-provenance-chart-target={target}
-                    style={{ padding: '15px', minWidth: '100%', backgroundColor: bgColor, color: textColor, borderRadius: '4px' }}
+                    style={{ padding: '15px', minWidth: '100%', boxSizing: 'border-box', backgroundColor: bgColor, color: textColor, borderRadius: '4px' }}
                 >
                     {renderBody()}
                 </div>
@@ -1349,7 +1351,7 @@ const Chart = ({
         return (
             <div
                 data-provenance-chart-target={target}
-                style={{ padding: '15px', minWidth: '100%', backgroundColor: bgColor, color: textColor, borderRadius: '4px' }}
+                style={{ padding: '15px', minWidth: '100%', boxSizing: 'border-box', backgroundColor: bgColor, color: textColor, borderRadius: '4px' }}
             >
                 {renderBody()}
                 {renderHeader()}

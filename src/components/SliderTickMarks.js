@@ -5,11 +5,10 @@ import {
     getSliderPosition,
 } from "./sliderTicks.js";
 
-const labelTransform = position => {
-    if (position <= 0) return "translateX(0)";
-    if (position >= 100) return "translateX(-100%)";
-    return "translateX(-50%)";
-};
+// Labels represent data coordinates, so their centers must stay on the same
+// x positions as the handles, ticks, and temporal-view points. Endpoint text
+// is intentionally allowed to extend beyond the track.
+const labelTransform = () => "translateX(-50%)";
 
 const SliderTickMarks = ({
     min,

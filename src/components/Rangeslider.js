@@ -33,6 +33,7 @@ import {
     getTooltipAnchorProps,
 } from "./provenanceTooltip.js";
 import { resolveTemporalBrushEnabled } from "./singleSliderTemporal.js";
+import { getSliderViewPanelLayout } from "./sliderViewLayout.js";
 
 /**
  * V2 Range Slider with the PW 1.0 interaction contract.
@@ -109,6 +110,10 @@ const Rangeslider = (props) => {
         valuesEqual: rangeSliderValuesEqual,
     });
     const [displayValue, setDisplayValue] = useState(currentValue);
+    const viewPanelLayout = getSliderViewPanelLayout({
+        temporalBrush,
+        entryCount: strategy?.detailedData?.size ?? 0,
+    });
     const currentValueRef = useRef(currentValue);
     currentValueRef.current = currentValue;
     const currentValueKey = rangeSliderValueKey(currentValue);
@@ -423,12 +428,14 @@ const Rangeslider = (props) => {
 
             {visualize && isDropdownVisible && (
                 <div
-                    style={{
-                        position: "absolute",
-                        top: "100%",
-                        left: 0,
-                        width: "100%",
-                        border: "1px solid #ccc",
+                     style={{
+                         position: "absolute",
+                         top: "100%",
+                         left: `${viewPanelLayout.panelOffset}px`,
+                         width:
+                             `calc(100% + ${viewPanelLayout.panelExtraWidth}px)`,
+                         border: "1px solid #ccc",
+                         boxSizing: "border-box",
                         backgroundColor: "#fff",
                         zIndex: 1000,
                         borderRadius: "4px",
