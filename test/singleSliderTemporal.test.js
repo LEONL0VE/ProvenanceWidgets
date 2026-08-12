@@ -7,6 +7,7 @@ import {
     filterTemporalEntries,
     getTemporalYPositions,
     normalizeTemporalBrush,
+    resolveTemporalBrushEnabled,
     PW1_TEMPORAL_LINE_COLOR,
     PW1_TEMPORAL_LINE_WIDTH,
     restoreTemporalPoint,
@@ -92,10 +93,27 @@ test("maps a PW-style vertical brush to an inclusive interaction range", () => {
     );
 });
 
-test("keeps Temporal brush opt-in and hidden by default", () => {
+test("normalizes the Temporal brush render flag", () => {
     assert.equal(normalizeTemporalBrush(undefined), false);
     assert.equal(normalizeTemporalBrush(false), false);
     assert.equal(normalizeTemporalBrush(true), true);
+});
+
+test("enables Temporal range selection by default", () => {
+    assert.equal(resolveTemporalBrushEnabled(), true);
+    assert.equal(resolveTemporalBrushEnabled({}), true);
+    assert.equal(
+        resolveTemporalBrushEnabled({ temporalBrush: false }),
+        false
+    );
+    assert.equal(
+        resolveTemporalBrushEnabled({ temporalBrush: true }),
+        true
+    );
+    assert.equal(
+        resolveTemporalBrushEnabled({ enableTemporalBrush: false }),
+        false
+    );
 });
 
 test("maps a time-mode brush through visible timestamp positions", () => {

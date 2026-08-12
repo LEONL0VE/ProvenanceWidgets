@@ -7,7 +7,6 @@ import {
     useRef,
     useState,
 } from "react";
-import { Slider as Slider_ } from "primereact/slider/slider.esm.js";
 import {
     SelectionProvenance,
     UNILATERAL_GUIDANCE_EVENT_NAME,
@@ -37,6 +36,8 @@ import {
     normalizeSelectionBrushRange,
 } from "./selectionTimeline.js";
 import { shouldCommitSliderChange } from "./singleSliderInteraction.js";
+import { resolveTemporalBrushEnabled } from "./singleSliderTemporal.js";
+import TemporalRangeSlider from "./TemporalRangeSlider.js";
 
 export { useCheckboxGroup };
 
@@ -104,8 +105,10 @@ const CheckboxGroup = (props) => {
         : childValues;
     const tooltipLabel = dataLabel ?? legacyDataLabel ?? id;
     const visualize = props.visualize ?? true;
-    const temporalBrush =
-        temporalBrushProp ?? enableTemporalBrush ?? false;
+    const temporalBrush = resolveTemporalBrushEnabled({
+        temporalBrush: temporalBrushProp,
+        enableTemporalBrush,
+    });
     const legacyValueField =
         usesData &&
         !props.optionValue &&
@@ -623,49 +626,19 @@ const CheckboxGroup = (props) => {
                         data-provenance-chart-target={id}
                         style={{
                             marginLeft: "32px",
-                            marginBottom: "4px",
+                            marginBottom: "12px",
                         }}
                     >
                         {temporalBrush && (
-                            <div
-                                data-provenance-temporal-brush={id}
-                                title={
-                                    "Drag both handles to zoom the " +
-                                    "visible provenance range"
-                                }
-                            >
-                                <Slider_
-                                    range
-                                    min={0}
-                                    max={100}
-                                    value={brushDisplayRange}
-                                    onChange={handleBrushChange}
-                                    onSlideEnd={handleBrushEnd}
-                                    aria-label={
-                                        `${tooltipLabel} temporal range`
-                                    }
-                                    style={{ marginBottom: "7px" }}
-                                />
-                            </div>
+                            <TemporalRangeSlider
+                                id={id}
+                                label={tooltipLabel}
+                                mode={provenanceMode}
+                                value={brushDisplayRange}
+                                onChange={handleBrushChange}
+                                onSlideEnd={handleBrushEnd}
+                            />
                         )}
-                        <div
-                            style={{
-                                borderTop: "2px solid #4b5563",
-                                display: "flex",
-                                justifyContent: "space-between",
-                                fontSize: "12px",
-                                fontWeight: 600,
-                                color: "#4b5563",
-                                paddingTop: "2px",
-                            }}
-                        >
-                            <span>
-                                {provenanceMode === "time"
-                                    ? "t=0"
-                                    : "n=0"}
-                            </span>
-                            <span>now</span>
-                        </div>
                     </div>
                 )}
                 {renderedChildren}

@@ -64,8 +64,7 @@ const ProvenanceProvider = ({ children }) => {
         widgetRegistrationsRef.current = nextRegistrations;
         setWidgetRegistrations(nextRegistrations);
 
-        // Keep the original strategy Map alive during the incremental V2
-        // migration. Existing Chart/Aggregate components still consume it.
+        // Strategy-based views consume this map directly.
         setRegisteredComponents(previous => {
             const next = previous instanceof Map
                 ? new Map(previous)

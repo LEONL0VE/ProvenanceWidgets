@@ -25,6 +25,7 @@ import {
     formatAggregateTooltip,
     getTooltipAnchorProps,
 } from "./provenanceTooltip.js";
+import { resolveTemporalBrushEnabled } from "./singleSliderTemporal.js";
 
 const callValueCallbacks = (props, value, event) => {
     const callbacks = new Set([
@@ -42,7 +43,7 @@ const callValueCallbacks = (props, value, event) => {
  *
  * Current React callers can keep using `min`, `max`, `step`, `value`, and
  * `onChange`. The V1-style `options` object and public provenance contract
- * are accepted at the same time to support an incremental migration.
+ * are also supported.
  */
 const Singleslider = (props) => {
     const options = props.options ?? {};
@@ -59,10 +60,7 @@ const Singleslider = (props) => {
     const tooltipLabel =
         props.dataLabel ?? props["data-label"] ?? props.id;
     const visualize = props.visualize ?? true;
-    const temporalBrush =
-        props.temporalBrush ??
-        props.enableTemporalBrush ??
-        false;
+    const temporalBrush = resolveTemporalBrushEnabled(props);
     const tooltip = useProvenanceTooltip();
     const [revertedValue] = useRevertedValue(props.id);
     const {

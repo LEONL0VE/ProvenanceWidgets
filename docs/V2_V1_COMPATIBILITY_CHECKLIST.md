@@ -59,9 +59,9 @@ when both its public contract and its visible interaction behavior pass.
 - [ ] Add a component contract test in a DOM test environment.
 - [x] Restore a value by directly clicking its Aggregate bar.
 - [x] Restore a value by directly clicking its Temporal point.
-- [x] Keep Temporal brush/zoom available as `temporalBrush={true}`, hidden
-  by default for Super Widgets, and attach the opt-in brushY to the PW 1.0
-  vertical axis with usage guidance.
+- [x] Enable Temporal brush/zoom by default for SuperProvenanceWidgets while
+  retaining `temporalBrush={false}` as an explicit opt-out. Attach brushY to
+  the PW 1.0 vertical axis with usage guidance.
 - [x] Show the live time sample endpoint and position time-mode points by time.
 - [x] Verify the disabled, Aggregate, and Temporal footprint states.
 

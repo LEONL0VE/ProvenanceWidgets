@@ -32,6 +32,7 @@ import {
     formatAggregateTooltip,
     getTooltipAnchorProps,
 } from "./provenanceTooltip.js";
+import { resolveTemporalBrushEnabled } from "./singleSliderTemporal.js";
 
 /**
  * V2 Range Slider with the PW 1.0 interaction contract.
@@ -58,10 +59,7 @@ const Rangeslider = (props) => {
     const tooltipLabel =
         props.dataLabel ?? props["data-label"] ?? props.id;
     const visualize = props.visualize ?? true;
-    const temporalBrush =
-        props.temporalBrush ??
-        props.enableTemporalBrush ??
-        false;
+    const temporalBrush = resolveTemporalBrushEnabled(props);
     const tooltipId = useProvenanceTooltip();
     const [revertedValue] = useRevertedValue(props.id);
     const {

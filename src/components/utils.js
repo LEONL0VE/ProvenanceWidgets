@@ -27,7 +27,6 @@ import { color } from 'd3-color';
 export function getScentColor(value, guidance, orientationScheme, colorDomain = "index") {
     if (!guidance || !guidance.aggregateData || !guidance.domain) return null;
 
-    // Logic duplicated from Bars.js
     const data = guidance.aggregateData.get(value);
     if (!data) return null;
 
@@ -44,12 +43,8 @@ export function getContrastColor(backgroundColor) {
     const c = color(backgroundColor);
     if (!c) return 'black';
 
-    // Calculate relative luminance
-    // https://www.w3.org/TR/WCAG20/#relativeluminancedef
     const luminance = 0.2126 * (c.r / 255) + 0.7152 * (c.g / 255) + 0.0722 * (c.b / 255);
 
-    // Threshold can be adjusted. 0.5 is standard middle grey perception.
-    // Lower threshold means we tolerate darker colors before switching to white.
     return luminance < 0.5 ? 'white' : 'black';
 }
 

@@ -1,11 +1,9 @@
 import { Button } from 'primereact/button/button.esm.js';
 import { useState, useRef, useEffect, useMemo, useContext } from 'react';
 import { Tooltip } from 'react-tooltip';
-import Chart from "./Chart.js"
 import useProvenance from './hooks/useProvenance.js';
 import useWidgetColors from './hooks/useWidgetColors.js';
 import useWidgetRegistry from './hooks/useWidgetRegistry.js';
-import Internal_Chart from './Internal_Chart.js';
 import { scaleOrdinal } from 'd3-scale';
 import { schemeCategory10 } from 'd3-scale-chromatic';
 import ProvenanceContext from './contexts/provenance.js';
@@ -17,7 +15,7 @@ import {
 
 const Internal_ProvenanceButton = ({ prov }) => {
     const [open, setOpen] = useState()
-    const [registeredComponents, setRegisteredComponents] = useProvenance()
+    const [registeredComponents] = useProvenance()
     const [widgetColors] = useWidgetColors()
     const { registrations } = useWidgetRegistry();
     const context = useContext(ProvenanceContext);
@@ -41,9 +39,6 @@ const Internal_ProvenanceButton = ({ prov }) => {
             source: "history",
         });
 
-        // Temporary compatibility path for widgets that have not yet moved
-        // to explicit metadata registration. Migrated widgets, including the
-        // single slider, are restored above through their own setValue.
         for (const widgetId of widgetIds) {
             if (registrations.has(widgetId)) continue;
             const widgetProvenance = registeredComponents.get(widgetId);
@@ -56,10 +51,8 @@ const Internal_ProvenanceButton = ({ prov }) => {
             let lastValueAtTime = null;
             let hasHistoryAtTime = false;
 
-            // Sort entries by time to find the latest one before or at targetTime
             const sortedEntries = [];
 
-            // Check if this is GenericProvenance (NumericProvenance/TextProvenance)
             const isGenericProvenance = detailedDataEntries.length > 0 &&
                 typeof detailedDataEntries[0][0] === 'number' &&
                 detailedDataEntries[0][1] &&
@@ -86,8 +79,6 @@ const Internal_ProvenanceButton = ({ prov }) => {
                     lastValueAtTime = sortedEntries[0].value;
                 }
             } else if (isSelectionProvenance) {
-                // For SelectionProvenance, each checkbox/item has its own history.
-                // We need to find the status of ALL items at that time.
                 const selectedLabelsAtTime = [];
                 for (const [label, records] of detailedDataEntries) {
                     const labelHistory = [];
@@ -114,7 +105,6 @@ const Internal_ProvenanceButton = ({ prov }) => {
                         }
                     }
                 }
-                // SelectionProvenance returns array for checkboxes or single value for radio
                 if (widgetId.includes('radiobutton')) {
                     lastValueAtTime = selectedLabelsAtTime[0] || null;
                 } else {
@@ -130,11 +120,8 @@ const Internal_ProvenanceButton = ({ prov }) => {
         setRevertedValuesContext(newRevertedValues);
     };
 
-    // Use D3 chromatic scale for color allocation (same as AggregateView)
     const colorScale = useMemo(() => scaleOrdinal(schemeCategory10), []);
 
-    // Build a sequence of real interactions only. Initial baselines remain in
-    // each widget strategy for replay, but are not SuperProvenance events.
     const interactionSequence = useMemo(() => {
         return buildSuperInteractionSequence({
             superProvenance: prov,
@@ -152,8 +139,7 @@ const Internal_ProvenanceButton = ({ prov }) => {
     const handleClickOutside = (event) => {
         if (buttonRef.current && !buttonRef.current.contains(event.target) &&
             dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-            console.log('Clicked outside the button!');
-            setOpen(false); // Example action: hide content
+            setOpen(false);
         }
     };
 
@@ -165,20 +151,16 @@ const Internal_ProvenanceButton = ({ prov }) => {
         };
     }, []);
 
-    // Measure AggregateView width and position when open state changes
     useEffect(() => {
         if (open) {
             const updateDimensions = () => {
-                // Find AggregateView by looking for the container with colored boxes
                 const coloredBoxes = document.querySelectorAll('[data-tooltip-id^="widget-tooltip-"]');
                 if (coloredBoxes.length > 0) {
-                    // Find the parent container that holds all the colored boxes
                     const aggregateContainer = coloredBoxes[0].closest('div[style*="display: flex"]');
                     if (aggregateContainer) {
                         const width = aggregateContainer.offsetWidth;
                         setDropdownWidth(width);
 
-                        // Calculate left offset relative to the positioned parent
                         const parentContainer = buttonRef.current?.closest('div[style*="position: relative"]');
                         if (parentContainer) {
                             const aggregateRect = aggregateContainer.getBoundingClientRect();
@@ -188,10 +170,8 @@ const Internal_ProvenanceButton = ({ prov }) => {
                         }
                     }
                 } else {
-                    // Fallback: try to find by sibling relationship
                     const buttonContainer = buttonRef.current?.closest('div[style*="display: flex"][style*="position: relative"]');
                     if (buttonContainer) {
-                        // Find AggregateView as a sibling
                         const siblings = Array.from(buttonContainer.children);
                         const aggregateView = siblings.find(child => {
                             return child !== buttonRef.current?.parentElement &&
@@ -208,13 +188,10 @@ const Internal_ProvenanceButton = ({ prov }) => {
                 }
             };
 
-            // Small delay to ensure DOM is ready
             const timeout = setTimeout(updateDimensions, 10);
             updateDimensions();
 
-            // Update on window resize
             window.addEventListener('resize', updateDimensions);
-            // Also update periodically to catch AggregateView width changes
             const interval = setInterval(updateDimensions, 200);
 
             return () => {
@@ -245,14 +222,6 @@ const Internal_ProvenanceButton = ({ prov }) => {
                         : <img width={30} height={30} src={AGGREGATE_B64} />
                     }
                 />
-                {/* <Tooltip
-                id={"open-tooltip-"}
-                events={['click']}
-                opacity={1}
-                style={{ zIndex: 100 }}
-            >
-                <Internal_Chart prov={prov} />
-                </Tooltip> */}
             </div>
             {open && (
                 <div
@@ -273,7 +242,6 @@ const Internal_ProvenanceButton = ({ prov }) => {
                         flexDirection: 'column',
                         gap: '0.5rem'
                     }}>
-                    {/* Sequence of colored boxes representing all interactions - at the top */}
                     {interactionSequence.length > 0 && (
                         <div style={{
                             display: 'flex',
@@ -310,18 +278,16 @@ const Internal_ProvenanceButton = ({ prov }) => {
                         </div>
                     )}
 
-                    {/* Rows for each registered component */}
                     {temporalWidgetIds.map((target, index) => (
                         <div key={target} style={{
                             position: 'relative',
                             borderBottom: index < temporalWidgetIds.length - 1 ? '1px solid #eee' : 'none',
-                            minHeight: '32px' // Ensure minimum height
+                            minHeight: '32px'
                         }}>
                             <div style={{ padding: '0.5rem', position: 'relative', zIndex: 1 }}>
                                 <label style={{ fontSize: '14px', fontWeight: '500', color: '#999' }}>{target}</label>
                             </div>
 
-                            {/* Aligned colored boxes matching the interaction sequence - Overlay */}
                             <div style={{
                                 position: 'absolute',
                                 top: 0,
@@ -329,22 +295,21 @@ const Internal_ProvenanceButton = ({ prov }) => {
                                 display: 'flex',
                                 width: '100%',
                                 height: '100%',
-                                zIndex: 2, // On top of label
-                                pointerEvents: 'none' // Allow clicks to pass through
+                                zIndex: 2,
+                                pointerEvents: 'none'
                             }}>
                                 {interactionSequence.map((interaction, idx) => (
                                     <div key={idx} style={{
                                         width: interaction.width,
                                         height: '100%',
                                         backgroundColor: interaction.widgetId === target ? interaction.color : 'transparent',
-                                        opacity: 0.45 // 55% transparent
+                                        opacity: 0.45
                                     }} />
                                 ))}
                             </div>
                         </div>
                     ))}
 
-                    {/* Arrow and title at the bottom */}
                     <div style={{
                         marginTop: '1rem',
                         display: 'flex',
@@ -352,7 +317,6 @@ const Internal_ProvenanceButton = ({ prov }) => {
                         alignItems: 'center',
                         width: '100%'
                     }}>
-                        {/* Arrow from left to right */}
                         <div style={{ width: '100%', position: 'relative', height: '20px', display: 'flex', alignItems: 'center' }}>
                             <div style={{
                                 width: '90%',
@@ -373,7 +337,6 @@ const Internal_ProvenanceButton = ({ prov }) => {
                                 }}></div>
                             </div>
                         </div>
-                        {/* Title below arrow */}
                         <p style={{
                             margin: 0,
                             fontSize: '14px',

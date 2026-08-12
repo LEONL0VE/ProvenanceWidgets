@@ -8,6 +8,7 @@ import {
     getSingleSelectCaller,
     getSingleSelectOptionKey,
     getSingleSelectOptionLabel,
+    isSingleSelectOptionDisabled,
     provenanceValueToSingleSelect,
     resolveSingleSelectOption,
     restoreSingleSelectTemporalValue,
@@ -107,6 +108,31 @@ test("uses optionValue only for the underlying PrimeReact value", () => {
             value: "LDN",
         }),
         "LDN"
+    );
+});
+
+test("respects default, field, and callback disabled options", () => {
+    assert.equal(
+        isSingleSelectOptionDisabled({ disabled: true }),
+        true
+    );
+    assert.equal(
+        isSingleSelectOptionDisabled(
+            { unavailable: true },
+            "unavailable"
+        ),
+        true
+    );
+    assert.equal(
+        isSingleSelectOptionDisabled(
+            { code: "LDN" },
+            option => option.code === "LDN"
+        ),
+        true
+    );
+    assert.equal(
+        isSingleSelectOptionDisabled({ disabled: false }),
+        false
     );
 });
 

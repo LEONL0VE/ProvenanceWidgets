@@ -12,6 +12,21 @@ const readOptionField = (option, field) => {
     return option[field];
 };
 
+export const isSingleSelectOptionDisabled = (
+    option,
+    optionDisabled
+) => {
+    if (typeof optionDisabled === "function") {
+        return optionDisabled(option) === true;
+    }
+    return readOptionField(
+        option,
+        typeof optionDisabled === "string"
+            ? optionDisabled
+            : "disabled"
+    ) === true;
+};
+
 const normalizeKey = value => {
     if (value === undefined || value === null) return null;
     if (typeof value === "string" || typeof value === "number") {

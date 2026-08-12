@@ -6,6 +6,11 @@ export const PW1_TEMPORAL_LINE_WIDTH = 1;
 
 export const normalizeTemporalBrush = value => value === true;
 
+export const resolveTemporalBrushEnabled = ({
+    temporalBrush,
+    enableTemporalBrush,
+} = {}) => temporalBrush ?? enableTemporalBrush ?? true;
+
 export const brushSelectionToIndexRange = (
     selection,
     height,

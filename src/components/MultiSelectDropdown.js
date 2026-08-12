@@ -1,5 +1,4 @@
 import { MultiSelect as MultiSelect_ } from "primereact/multiselect/multiselect.esm.js";
-import { Slider as Slider_ } from "primereact/slider/slider.esm.js";
 import {
     useCallback,
     useEffect,
@@ -48,6 +47,8 @@ import {
     normalizeSelectionBrushRange,
 } from "./selectionTimeline.js";
 import { shouldCommitSliderChange } from "./singleSliderInteraction.js";
+import { resolveTemporalBrushEnabled } from "./singleSliderTemporal.js";
+import TemporalRangeSlider from "./TemporalRangeSlider.js";
 
 const MultiSelectItem = ({
     children,
@@ -264,8 +265,10 @@ const MultiSelectDropdown = (props) => {
     } = props;
     const tooltipLabel = dataLabel ?? legacyDataLabel ?? id;
     const visualize = props.visualize ?? true;
-    const temporalBrush =
-        temporalBrushProp ?? enableTemporalBrush ?? false;
+    const temporalBrush = resolveTemporalBrushEnabled({
+        temporalBrush: temporalBrushProp,
+        enableTemporalBrush,
+    });
     const config = useMemo(
         () => ({
             dataKey: props.dataKey,
@@ -766,53 +769,23 @@ const MultiSelectDropdown = (props) => {
                                     display: "flex",
                                     flexDirection: "column",
                                     width: "100%",
-                                    padding: "8px 12px",
+                                    padding: "8px 20px 12px",
                                     gap: "6px",
                                     borderTop: "1px solid #ced4da",
                                     backgroundColor: "#fff",
                                 }}
                             >
                                 {temporalBrush && (
-                                    <div
-                                        data-provenance-temporal-brush={id}
-                                        title={
-                                            "Drag both handles to zoom " +
-                                            "the visible provenance range"
-                                        }
-                                    >
-                                        <Slider_
-                                            range
-                                            min={0}
-                                            max={100}
-                                            value={brushDisplayRange}
-                                            onChange={handleBrushChange}
-                                            onSlideEnd={handleBrushEnd}
-                                        />
-                                    </div>
+                                    <TemporalRangeSlider
+                                        id={id}
+                                        label={tooltipLabel}
+                                        mode={provenanceMode}
+                                        placement="footer"
+                                        value={brushDisplayRange}
+                                        onChange={handleBrushChange}
+                                        onSlideEnd={handleBrushEnd}
+                                    />
                                 )}
-                                <div
-                                    aria-hidden="true"
-                                    style={{
-                                        height: "2px",
-                                        backgroundColor: "#343a40",
-                                    }}
-                                />
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        fontSize: "12px",
-                                        color: "#6c757d",
-                                        fontWeight: "bold",
-                                    }}
-                                >
-                                    <span>
-                                        {provenanceMode === "time"
-                                            ? "t=0"
-                                            : "n=0"}
-                                    </span>
-                                    <span>now</span>
-                                </div>
                             </div>
                         )}
                     </>

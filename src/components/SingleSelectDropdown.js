@@ -1,5 +1,4 @@
 import { Dropdown as Dropdown_ } from "primereact/dropdown/dropdown.esm.js";
-import { Slider as Slider_ } from "primereact/slider/slider.esm.js";
 import {
     useCallback,
     useEffect,
@@ -33,6 +32,7 @@ import {
     getSingleSelectCaller,
     getSingleSelectOptionKey,
     getSingleSelectOptionLabel,
+    isSingleSelectOptionDisabled,
     provenanceValueToSingleSelect,
     resolveSingleSelectOption,
     restoreSingleSelectTemporalValue,
@@ -44,6 +44,8 @@ import {
     normalizeSelectionBrushRange,
 } from "./selectionTimeline.js";
 import { shouldCommitSliderChange } from "./singleSliderInteraction.js";
+import { resolveTemporalBrushEnabled } from "./singleSliderTemporal.js";
+import TemporalRangeSlider from "./TemporalRangeSlider.js";
 
 const SingleSelectItem = ({
     children,
@@ -59,6 +61,7 @@ const SingleSelectItem = ({
     tooltipLabel,
     visualize,
     onTemporalRestore,
+    onSelect,
 }) => {
     const [containerRef, { width: containerWidth }] =
         useElementSize();
@@ -127,6 +130,7 @@ const SingleSelectItem = ({
         <div
             ref={containerRef}
             {...aggregateTooltipProps}
+            onClick={event => onSelect(option, event)}
             data-provenance-chart-target={target}
             data-provenance-option={optionKey}
             style={{
@@ -258,8 +262,10 @@ const SingleSelectDropdown = (props) => {
     } = props;
     const tooltipLabel = dataLabel ?? legacyDataLabel ?? id;
     const visualize = props.visualize ?? true;
-    const temporalBrush =
-        temporalBrushProp ?? enableTemporalBrush ?? false;
+    const temporalBrush = resolveTemporalBrushEnabled({
+        temporalBrush: temporalBrushProp,
+        enableTemporalBrush,
+    });
     const config = useMemo(
         () => ({
             dataKey: props.dataKey,
@@ -293,7 +299,6 @@ const SingleSelectDropdown = (props) => {
         useState([0, 100]);
     const elementRef = useRef(null);
     const dropdownRef = useRef(null);
-    const reopenAfterSelectionRef = useRef(false);
     const propsRef = useRef(props);
     const optionsRef = useRef(options);
     const configRef = useRef(config);
@@ -527,7 +532,6 @@ const SingleSelectDropdown = (props) => {
             if (open) {
                 dropdownRef.current?.show?.();
             } else {
-                reopenAfterSelectionRef.current = false;
                 dropdownRef.current?.hide?.();
             }
         };
@@ -547,9 +551,6 @@ const SingleSelectDropdown = (props) => {
     }, [revertedValue, applyRegisteredValue]);
 
     const handleChange = event => {
-        if (showTimeline) {
-            reopenAfterSelectionRef.current = true;
-        }
         const nextSelection = resolveSingleSelectOption(
             options,
             event.value,
@@ -574,6 +575,42 @@ const SingleSelectDropdown = (props) => {
             event
         );
         dropdownProps.onChange?.(event);
+    };
+
+    const selectOption = (option, originalEvent) => {
+        originalEvent.preventDefault();
+        originalEvent.stopPropagation();
+
+        const optionDisabled =
+            dropdownProps.optionDisabled ??
+            primeProps.optionDisabled;
+        if (isSingleSelectOptionDisabled(option, optionDisabled)) {
+            return;
+        }
+
+        const value = getPrimeSingleSelectValue(option, config);
+        const nextValue = singleSelectToProvenanceValue(
+            option,
+            config
+        );
+        if (
+            singleSelectValueKey(nextValue) ===
+            singleSelectValueKey(currentValueRef.current)
+        ) {
+            return;
+        }
+
+        handleChange({
+            originalEvent,
+            value,
+            target: {
+                id,
+                name: dropdownProps.name ?? primeProps.name,
+                value,
+            },
+            preventDefault: () => originalEvent.preventDefault(),
+            stopPropagation: () => originalEvent.stopPropagation(),
+        });
     };
 
     const handleTemporalRestore = optionKey => {
@@ -684,18 +721,6 @@ const SingleSelectDropdown = (props) => {
                 onHide={event => {
                     primeProps.onHide?.(event);
                     dropdownProps.onHide?.(event);
-                    if (
-                        showTimeline &&
-                        reopenAfterSelectionRef.current
-                    ) {
-                        reopenAfterSelectionRef.current = false;
-                        setTimeout(
-                            () => dropdownRef.current?.show?.(),
-                            0
-                        );
-                        return;
-                    }
-                    reopenAfterSelectionRef.current = false;
                     if (showTimeline) {
                         window.dispatchEvent(new CustomEvent(
                             "provenance-dropdown-visibility",
@@ -740,6 +765,7 @@ const SingleSelectDropdown = (props) => {
                             onTemporalRestore={
                                 handleTemporalRestore
                             }
+                            onSelect={selectOption}
                         >
                             {content}
                         </SingleSelectItem>
@@ -755,53 +781,23 @@ const SingleSelectDropdown = (props) => {
                                     display: "flex",
                                     flexDirection: "column",
                                     width: "100%",
-                                    padding: "8px 12px",
+                                    padding: "8px 20px 12px",
                                     gap: "6px",
                                     borderTop: "1px solid #ced4da",
                                     backgroundColor: "#fff",
                                 }}
                             >
                                 {temporalBrush && (
-                                    <div
-                                        data-provenance-temporal-brush={id}
-                                        title={
-                                            "Drag both handles to zoom " +
-                                            "the visible provenance range"
-                                        }
-                                    >
-                                        <Slider_
-                                            range
-                                            min={0}
-                                            max={100}
-                                            value={brushDisplayRange}
-                                            onChange={handleBrushChange}
-                                            onSlideEnd={handleBrushEnd}
-                                        />
-                                    </div>
+                                    <TemporalRangeSlider
+                                        id={id}
+                                        label={tooltipLabel}
+                                        mode={provenanceMode}
+                                        placement="footer"
+                                        value={brushDisplayRange}
+                                        onChange={handleBrushChange}
+                                        onSlideEnd={handleBrushEnd}
+                                    />
                                 )}
-                                <div
-                                    aria-hidden="true"
-                                    style={{
-                                        height: "2px",
-                                        backgroundColor: "#343a40",
-                                    }}
-                                />
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        fontSize: "12px",
-                                        color: "#6c757d",
-                                        fontWeight: "bold",
-                                    }}
-                                >
-                                    <span>
-                                        {provenanceMode === "time"
-                                            ? "t=0"
-                                            : "n=0"}
-                                    </span>
-                                    <span>now</span>
-                                </div>
                             </div>
                         )}
                     </>

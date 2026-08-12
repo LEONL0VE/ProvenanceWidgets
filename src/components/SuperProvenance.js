@@ -22,12 +22,10 @@ const SuperProvenance = (props) => {
         })
 
         const handleSuperChange = () => {
-            // Bump reference so consumers re-render and can read updated provenance
             setRegisteredComponents(prev => {
                 if (prev instanceof Map) {
                     return new Map(prev)
                 }
-                // Fallback: create new Map if prev is not a Map
                 return new Map()
             })
         };
@@ -94,8 +92,6 @@ const SuperProvenance = (props) => {
             if (metadata) {
                 superProvenance.register(metadata);
             } else {
-                // Compatibility for the six widgets not yet migrated. No
-                // behavior is inferred from their id.
                 superProvenance.register(
                     widgetId,
                     strategy,

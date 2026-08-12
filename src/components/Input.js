@@ -28,6 +28,7 @@ import {
     formatAggregateTooltip,
     getTooltipAnchorProps,
 } from "./provenanceTooltip.js";
+import { resolveTemporalBrushEnabled } from "./singleSliderTemporal.js";
 
 /**
  * V2 Input Text with the PW 1.0 search interaction contract.
@@ -43,6 +44,7 @@ const InputText = (props) => {
     const tooltipLabel =
         props.dataLabel ?? props["data-label"] ?? id;
     const visualize = props.visualize ?? true;
+    const temporalBrush = resolveTemporalBrushEnabled(props);
     const tooltip = useProvenanceTooltip();
     const [revertedValue] = useRevertedValue(id);
     const {
@@ -550,6 +552,7 @@ const InputText = (props) => {
                         provenance={serializedProvenance}
                         provenanceStrategy={strategy}
                         mode={provenanceMode}
+                        temporalBrush={temporalBrush}
                     />
                 </div>
             )}

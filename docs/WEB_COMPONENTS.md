@@ -104,7 +104,7 @@ available as the shown kebab-case attributes.
 | `freeze` | `freeze` | Stop recording while retaining interaction |
 | `visualize` | `visualize` | Show or hide the provenance footprint/view |
 | `dataLabel` | `data-label` | Business label used in tooltips |
-| `temporalBrush` | `temporal-brush` | Opt in to the temporal brush |
+| `temporalBrush` | `temporal-brush` | Enable or disable the temporal brush (enabled by default) |
 
 Event names are:
 

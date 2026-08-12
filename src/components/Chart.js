@@ -201,10 +201,8 @@ const Chart = ({
     provenance,
     provenanceStrategy,
     mode = "interaction",
-    temporalBrush = false,
+    temporalBrush = true,
 }) => {
-    // part: "full" | "header" | "body"
-    // theme: "dark" | "light"
     const chartRef = useRef(null);
     const [registeredComponents] = useProvenance();
     const { restoreWidgetValue } = useWidgetRegistry();
@@ -222,7 +220,6 @@ const Chart = ({
     const chartData = useMemo(() => {
         if (!target) return null;
 
-        // Get the component data based on target (Map first, fallback to plain object)
         const componentData = provenanceStrategy ?? (
             registeredComponents instanceof Map
                 ? registeredComponents.get(target)
@@ -236,12 +233,10 @@ const Chart = ({
                 ? new Map(Object.entries(componentData.domain))
                 : null;
         
-        // Get index domain
         const indexDomain = domain?.get
             ? domain.get("index")
             : domain?.index;
 
-        // Normalize detailedData entries for flexible data sources
         const detailedDataEntries = componentData.detailedData instanceof Map
             ? Array.from(componentData.detailedData.entries())
             : componentData.detailedData && typeof componentData.detailedData.entries === 'function'
@@ -252,13 +247,10 @@ const Chart = ({
 
         let isCheckboxGroup = false;
 
-        // Check if this is a checkbox group (SelectionProvenance)
-        // Checkbox groups have detailedData with string keys and TemporalSelectionRecord arrays
         if (detailedDataEntries.length > 0) {
             const firstEntry = detailedDataEntries[0];
             const firstKey = firstEntry[0];
             const firstValue = firstEntry[1];
-            // Check if keys are strings and values are arrays with select/unselect properties
             if (typeof firstKey === 'string' && 
                 Array.isArray(firstValue) && 
                 firstValue.length > 0 && 
@@ -267,11 +259,6 @@ const Chart = ({
             }
         }
         
-        // Check if this is a Single Select Dropdown (also SelectionProvenance)
-        // ... (previous comments) ...
-        
-        // Check if this is RangedProvenance (Range Slider)
-        // detailedData is typically Map<index, {value: [min, max], time, index}>
         let isRangedProvenance = false;
         if (detailedDataEntries.length > 0) {
             const val = detailedDataEntries[0][1];
@@ -280,32 +267,9 @@ const Chart = ({
             }
         }
         
-        // Check if this is TextProvenance (Input Text)
-        // TextProvenance extends SuperProvenance? No, it extends GenericProvenance usually, or SuperProvenance based on search results.
-        // Wait, TextProvenance.js in example shows `class TextProvenance extends SuperProvenance`.
-        // TextProvenance from core extends GenericProvenance<string>.
-        // Let's check detailedData structure.
-        // For TextProvenance, detailedData is typically Map<index, {value, time, index}> like NumericProvenance?
-        // OR does it track history of strings?
-        // If it's `TextProvenance.js` from example:
-        // `this.provenance.set(value, { interactions: 0, timestamps: [] })`
-        // It seems to be using `this.provenance` which is not standard `detailedData`.
-        // But `Input.js` uses `new TextProvenance()` from `../dist/index.js`.
-        // Let's assume it follows standard Provenance structure.
-        // If it extends GenericProvenance<string>, detailedData is Map<number, TemporalValueRecord<string>>.
-        // But we want a GANTT view "similar to single select and multi select, with all the stored input text items rendering on a separate row."
-        // This implies we want to see EACH UNIQUE TEXT VALUE as a row, and timeline bars when it was "active".
-        // Input text is usually a sequence of values.
-        // Value "A" at t1. Value "B" at t2. Value "A" at t3.
-        // We want:
-        // Row "A": [t1, t2] ... [t3, now]
-        // Row "B": [t2, t3]
-        
-        // We need to transform the linear history (index-based) into a per-value history (like SelectionProvenance).
         let isTextProvenance = false;
         let isNumericProvenance = false;
         
-        // Check if detailedData values are objects with 'value' property that is string
         if (detailedDataEntries.length > 0) {
             const val = detailedDataEntries[0][1];
             if (val && typeof val === 'object' && 'value' in val && typeof val.value === 'string' && !Array.isArray(val)) {
@@ -317,27 +281,6 @@ const Chart = ({
         }
 
         if (isRangedProvenance) {
-            // For Range Slider, we want y-axis as sequence of interactions and x-axis as range.
-            // detailedDataEntries: [[1, {value: [0, 20], time: ..., index: 1}], [2, {value: [10, 30], ...}]]
-            // We can reuse the same rendering logic if we format it as:
-            // label = "Interaction 1" (or timestamp?) -> records: [{select: {index: min}, unselect: {index: max}}]
-            // Wait, for range slider, the x-axis is VALUE (0 to 100), not time/index.
-            // The user said: "y axis being sequence of interactions and x-axis being the range."
-            // Sequence of interactions implies time/order goes DOWN the y-axis.
-            // X-axis is the range value (min to max).
-            
-            // So we need to map each historical record to a "row".
-            // Row 1: Interaction 1 ([0, 20])
-            // Row 2: Interaction 2 ([10, 30])
-            
-            // This is slightly different from the Gantt view where x-axis is time.
-            // Here x-axis is VALUE domain.
-            
-            // We can mock this by creating a structure where:
-            // key = "Interaction K"
-            // records = [{ select: { index: value[0] }, unselect: { index: value[1] } }]
-            // And we need to tell the renderer to use the VALUE domain (e.g. 0-100) instead of index domain.
-            
             const publicRecords =
                 provenance?.widgetType === "range-slider" &&
                 Array.isArray(provenance.data)
@@ -352,8 +295,6 @@ const Chart = ({
                         },
                     ])
                     : [];
-            // Public records include the live time-mode sample endpoint, while
-            // RangedProvenance intentionally contains only derived records.
             const sorted = (
                 publicRecords.length > 0
                     ? publicRecords
@@ -396,10 +337,6 @@ const Chart = ({
                 }]];
             });
             
-            // We need to pass the min/max of the slider as the domain.
-            // RangedProvenance has minValue and maxValue properties, but they might not be in the serialized `componentData` if it's just state.
-            // However, `registeredComponents` usually holds the class instance which has `minValue`/`maxValue`.
-            
             let min = 0;
             let max = 100;
             if (componentData.minValue !== undefined) min = componentData.minValue;
@@ -407,11 +344,10 @@ const Chart = ({
             
             return {
                 componentData,
-                // Oldest on top so the trajectory grows downward as interactions happen
                 detailedDataEntries: transformedData,
                 indexDomain: [min, max],
                 isCheckboxGroup: true,
-                isRangeSlider: true, // Flag to customize rendering if needed (e.g. axis labels)
+                isRangeSlider: true,
                 tooltipKind: 'range',
                 tooltipLabel: componentData.tooltipLabel ?? target,
                 mode,
@@ -433,7 +369,6 @@ const Chart = ({
                         },
                     ])
                     : [];
-            // Public records contain the live sample endpoint in time mode.
             const sorted = (
                 publicRecords.length > 0
                     ? publicRecords
@@ -471,7 +406,6 @@ const Chart = ({
                     interactionIndex += 1;
                 }
 
-                // Add first start
                 if (!grouped.has(currentVal)) grouped.set(currentVal, []);
                 grouped.get(currentVal).push({
                     select: {
@@ -538,13 +472,8 @@ const Chart = ({
                 }
             }
 
-            // Ensure we have a valid indexDomain that covers the latest interaction
-            // If the latest interaction is open-ended (no unselect), we need the domain max to be > start index
-            
-            // Get the max index from the data
             let dataMaxIndex = 0;
             if (sorted.length > 0) {
-                // The last record's index is the start of the latest state
                 dataMaxIndex = sorted[sorted.length - 1][1].index;
             }
             
@@ -582,8 +511,6 @@ const Chart = ({
         }
 
         if (isNumericProvenance) {
-            // Single slider: y-axis is sequence of interactions, x-axis is slider value domain.
-            // Render one point per interaction (no range).
             const publicRecords =
                 provenance?.widgetType === "single-slider" &&
                 Array.isArray(provenance.data)
@@ -638,7 +565,6 @@ const Chart = ({
 
             return {
                 componentData,
-                // Oldest on top so the trajectory grows downward as interactions happen
                 detailedDataEntries: transformedData,
                 indexDomain: [min, max],
                 isCheckboxGroup: true,
@@ -668,8 +594,6 @@ const Chart = ({
         provenanceStrategy,
         mode,
     ]);
-
-    // ... useEffect for D3 ...
 
     if (!chartData) return null;
 
@@ -726,7 +650,6 @@ const Chart = ({
             );
         };
         
-        // Calculate max index from data if domain is missing or to ensure bounds
         let calculatedMax = 0;
         for (const [, records] of sortedEntries) {
             for (const record of records) {
@@ -744,7 +667,6 @@ const Chart = ({
                 chartData.isInputText &&
                 (chartData.mode ?? mode) === "time"
             );
-        // For range slider, we use domain max. For others, ensure "now" is beyond the last event so open intervals have visible width.
         const baseMaxIndex = usesContinuousDomain
             ? domainMax
             : Math.max(domainMax, calculatedMax, 1);
@@ -777,9 +699,9 @@ const Chart = ({
             const brushWidth = brushEnabled ? 64 : 0;
             const leftLabelWidth = hasLeftAxisLabel
                 ? brushEnabled ? brushWidth : 28
-                : 0; // reserved width for brush and vertical y-label column
-            const leftLabelGap = hasLeftAxisLabel ? 8 : 0;    // gap between y-label and plot
-            const plotInset = hasLeftAxisLabel ? 6 : 0;       // inset used in body for endpoints
+                : 0;
+            const leftLabelGap = hasLeftAxisLabel ? 8 : 0;
+            const plotInset = hasLeftAxisLabel ? 6 : 0;
             const totalLeftGutter = leftLabelWidth + leftLabelGap + plotInset;
             const totalRightInset = plotInset;
             const innerWidthCalc = `calc(100% - ${totalLeftGutter + totalRightInset}px)`;
@@ -790,9 +712,7 @@ const Chart = ({
                     data-provenance-chart-target={target}
                     style={{ display: 'flex', flexDirection: 'column', width: '100%', marginTop: '8px' }}
                 >
-                    {/* The Line */}
                     <div data-timeline-axis={target} style={{ width: innerWidthCalc, marginLeft: innerMarginLeft, height: '4px', background: axisColor, borderRadius: '2px', position: 'relative' }}></div>
-                    {/* The Labels below */}
                     <div style={{ width: innerWidthCalc, marginLeft: innerMarginLeft, display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
                         <span style={{ fontSize: '12px', color: labelColor, fontWeight: 'bold' }}>
                            {chartData.isInputText &&
@@ -1017,7 +937,6 @@ const Chart = ({
                          }
                      />
                  )}
-                 {/* Y-Axis Label for Range/Single Slider (Left side, vertical) */}
                  {(
                      (chartData.isRangeSlider ||
                          chartData.isSingleSlider) &&
@@ -1025,7 +944,7 @@ const Chart = ({
                  ) && (
                      <div style={{ 
                          writingMode: 'vertical-rl', 
-                         transform: 'rotate(180deg)', // Standard rotation for left-side axis labels
+                         transform: 'rotate(180deg)',
                          fontSize: '12px', 
                          color: '#999', 
                          fontWeight: 'bold', 
@@ -1034,7 +953,7 @@ const Chart = ({
                          width: '28px',
                          minWidth: '28px',
                          whiteSpace: 'nowrap',
-                         alignSelf: 'center' // Center vertically relative to chart
+                         alignSelf: 'center'
                      }}>
                          {(chartData.mode ?? mode) === "time"
                              ? "time"
@@ -1055,10 +974,6 @@ const Chart = ({
                      position: 'relative',
                  }}>
                  
-                 {/* 
-                    For Range Slider, user wants VERTICAL connecting lines.
-                    This implies we are connecting points ACROSS rows (interactions), not within a row.
-                 */}
                  
                  {chartData.isRangeSlider || chartData.isSingleSlider ? (
                     <div style={{
@@ -1067,7 +982,6 @@ const Chart = ({
                         height: `${temporalPlotHeight}px`,
                         minHeight: `${temporalPlotHeight}px`,
                     }}>
-                        {/* SVG Overlay for Vertical Lines */}
                         <svg
                             height={temporalPlotHeight}
                             style={{ position: 'absolute', top: 0, left: '6px', width: 'calc(100% - 12px)', height: `${temporalPlotHeight}px`, overflow: 'visible', pointerEvents: 'none', zIndex: 0 }}
@@ -1086,13 +1000,11 @@ const Chart = ({
                             ))}
                          </svg>
 
-                         {/* Rows with Points (No horizontal lines) */}
                          <div style={{
                              position: 'relative',
                              height: `${temporalPlotHeight}px`,
                          }}>
                               {sortedEntries.map(([label, records], index) => {
-                                  // Calculate color for the row
                                   const totalRows = sortedEntries.length;
                                   const relativeIndex = index / (totalRows - 1 || 1);
                                   const color = interpolateOranges(0.3 + (relativeIndex * 0.7));
@@ -1108,7 +1020,6 @@ const Chart = ({
                                       right: 0,
                                       zIndex: 1,
                                   }}>
-                                      {/* Timeline takes full space with safe inset for endpoint visibility */}
                                       <div style={{ position: 'absolute', top: 0, left: '6px', width: 'calc(100% - 12px)', height: '100%', background: 'transparent', borderRadius: '3px', zIndex: 0 }}>
                                           {records.map((record, i) => {
                                                if (!record.select) return null;
@@ -1147,10 +1058,8 @@ const Chart = ({
                                                    )
                                                    : {};
                                                
-                                              // Render Points ONLY
                                                return (
                                                   <div key={i} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
-                                                        {/* Min Point */}
                                                         <div
                                                             {...lowTooltipProps}
                                                             role="button"
@@ -1228,7 +1137,6 @@ const Chart = ({
                                                                 }}
                                                             />
                                                         </div>
-                                                       {/* Max Point (Range slider only) */}
                                                        {chartData.isRangeSlider && (
                                                            <div
                                                                {...highTooltipProps}
@@ -1308,11 +1216,9 @@ const Chart = ({
                          </div>
                      </div>
                   ) : (
-                     // Default rendering for other components (Checkbox, Dropdown, Input)
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto', flexGrow: 1 }}>
                          {sortedEntries.map(([label, records]) => (
                               <div key={label} style={{ display: 'flex', alignItems: 'center', height: '24px', position: 'relative' }}>
-                                  {/* Timeline takes full space */}
                                   <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: rowBg, borderRadius: '3px', zIndex: 0 }}>
                                       {records.map((record, i) => {
                                            if (!record.select) return null;
@@ -1324,11 +1230,7 @@ const Chart = ({
                                            const left = ((start - minIndex) / (displaySpan || 1)) * 100;
                                            const width = Math.max(0, ((end - start) / (displaySpan || 1)) * 100);
                                            
-                                           // Calculate color based on start time relative to maxIndex (now)
-                                           // rangeSpan is the total time domain.
-                                           // relativeTime = 0 (start) to 1 (end/now).
                                            const relativeTime = (start - minIndex) / (displaySpan || 1);
-                                           // Map 0..1 to 0.3..1.0 color scale
                                            const color = interpolateOranges(0.3 + (relativeTime * 0.7));
                                            const tooltipProps = getTooltipAnchorProps(
                                                tooltipId,
@@ -1420,7 +1322,6 @@ const Chart = ({
                                       })}
                                   </div>
                                   
-                                  {/* Label overlay on top */}
                                   <div style={{ position: 'relative', zIndex: 1, padding: '0 8px', width: '100%', fontSize: '12px', fontWeight: 'bold', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', pointerEvents: 'none' }} title={label}>
                                       {label}
                                   </div>
@@ -1445,7 +1346,6 @@ const Chart = ({
             );
         }
 
-        // Full view (default) - used for Single Select Dropdown tooltip/dropdown
         return (
             <div
                 data-provenance-chart-target={target}
@@ -1457,7 +1357,6 @@ const Chart = ({
         );
     }
 
-    // Default D3 chart (always full)
     return (
         <div
             ref={chartRef}
