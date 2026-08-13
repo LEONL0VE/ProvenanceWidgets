@@ -2,6 +2,7 @@ import {
     access,
     copyFile,
     rename,
+    rm,
 } from "node:fs/promises";
 import { constants } from "node:fs";
 
@@ -23,12 +24,17 @@ const generatedTypes = new URL(
 const publicTypes = new URL("index.d.ts", outputDirectory);
 
 await access(generatedScript, constants.R_OK);
-await copyFile(generatedScript, publicScript);
 await copyFile(generatedTypes, publicTypes);
 
-try {
-    await rename(generatedStyles, publicStyles);
-} catch (error) {
-    if (error?.code !== "EPERM") throw error;
-    await copyFile(generatedStyles, publicStyles);
-}
+const publishGeneratedFile = async (generatedFile, publicFile) => {
+    try {
+        await rename(generatedFile, publicFile);
+    } catch (error) {
+        if (error?.code !== "EPERM") throw error;
+        await copyFile(generatedFile, publicFile);
+        await rm(generatedFile, { force: true });
+    }
+};
+
+await publishGeneratedFile(generatedScript, publicScript);
+await publishGeneratedFile(generatedStyles, publicStyles);

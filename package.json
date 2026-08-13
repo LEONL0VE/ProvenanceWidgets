@@ -24,9 +24,7 @@
     "./web-components/styles.css": "./dist/web-components/styles.css"
   },
   "files": [
-    "dist",
-    "docs",
-    "examples"
+    "dist"
   ],
   "peerDependencies": {
     "preact": "^10.29.2",
@@ -47,7 +45,7 @@
     "build": "npm run build:library && npm run build:web-components",
     "build:library": "tsup",
     "build:web-components": "tsup --config tsup.web-components.config.ts && node scripts/prepare-web-components.mjs",
-    "prepack": "npm run build",
+    "prepack": "npm run typecheck && npm run test:types",
     "prepare": "npm run build"
   },
   "devDependencies": {
