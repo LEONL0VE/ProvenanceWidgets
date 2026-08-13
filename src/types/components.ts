@@ -14,11 +14,12 @@ import type { MultiSelectProps as PrimeMultiSelectProps } from "primereact/multi
 import type { RadioButtonProps as PrimeRadioButtonProps } from "primereact/radiobutton";
 import type { SliderProps as PrimeSliderProps } from "primereact/slider";
 import type {
-  Guidance,
   LegacySerializedProvenance,
   ProvenanceChangeSource,
   ProvenanceController,
   ProvenanceMode,
+  ProvenanceScheduler,
+  ProvenanceStrategy,
   ProvenanceView,
   ProvenanceWidgetType,
   SerializedProvenance,
@@ -329,11 +330,6 @@ export type UseProvenanceResult = [
   Dispatch<SetStateAction<RegisteredProvenanceMap>>,
 ];
 
-export interface ProvenanceScheduler {
-  setInterval(callback: () => void, intervalMs: number): unknown;
-  clearInterval(intervalId: unknown): void;
-}
-
 export interface UseProvenanceControllerOptions<V> {
   id: string;
   widgetType: ProvenanceWidgetType;
@@ -344,8 +340,8 @@ export interface UseProvenanceControllerOptions<V> {
   freeze?: boolean;
   visualize?: boolean;
   onProvenanceChange?: CommonProvenanceWidgetProps<V>["onProvenanceChange"];
-  strategy?: Guidance<unknown, unknown, unknown>;
-  strategyFactory?: () => Guidance<unknown, unknown, unknown>;
+  strategy?: ProvenanceStrategy<unknown>;
+  strategyFactory?: () => ProvenanceStrategy<unknown>;
   now?: () => Date;
   scheduler?: ProvenanceScheduler;
   valuesEqual?: (left: V, right: V) => boolean;
@@ -362,7 +358,7 @@ export interface UseProvenanceControllerResult<V> {
   currentValue: V;
   hasProvenance: boolean;
   provenance: SerializedProvenance<V>;
-  strategy: Guidance<unknown, unknown, unknown>;
+  strategy: ProvenanceStrategy<unknown>;
   controller: ProvenanceController;
   recordInteraction(
     value: V,

@@ -213,20 +213,20 @@ const toComparablePoint = (value, mode) => {
  * the clicked timeline position, not only the row that received the click.
  */
 export const getMultiSelectKeysAtTimelinePoint = ({
-    guidance,
+    provenance,
     point,
     mode = "interaction",
 }) => {
     const target = toComparablePoint(point, mode);
     if (
         target === null ||
-        !(guidance?.detailedData instanceof Map)
+        !(provenance?.detailedData instanceof Map)
     ) {
         return [];
     }
 
     const selected = [];
-    for (const [key, records] of guidance.detailedData.entries()) {
+    for (const [key, records] of provenance.detailedData.entries()) {
         const active = (records ?? []).some(record => {
             const start = toComparablePoint(
                 mode === "time"

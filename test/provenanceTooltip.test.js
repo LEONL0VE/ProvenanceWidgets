@@ -142,7 +142,7 @@ test('formats temporal slider endpoints and input searches with PW ordinals', ()
 
 test('uses the last select time for radio/select and interaction time for multi-select', () => {
     const unselectTime = new Date(time.getTime() + 5_000);
-    const guidance = {
+    const provenance = {
         aggregateData: new Map([
             ['London', { selections: 1, interactions: 2, time: unselectTime }],
         ]),
@@ -152,11 +152,11 @@ test('uses the last select time for radio/select and interaction time for multi-
     };
 
     assert.equal(
-        getAggregateTooltipRecord(guidance, 'London', 'single-selection').time,
+        getAggregateTooltipRecord(provenance, 'London', 'single-selection').time,
         time
     );
     assert.equal(
-        getAggregateTooltipRecord(guidance, 'London', 'multi-selection').time,
+        getAggregateTooltipRecord(provenance, 'London', 'multi-selection').time,
         unselectTime
     );
 });

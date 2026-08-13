@@ -10,7 +10,7 @@ import { interpolateOranges } from "d3";
 import Bars from "./Bars.js";
 import {
     SelectionProvenance,
-    UNILATERAL_GUIDANCE_EVENT_NAME,
+    PROVENANCE_INSERT_EVENT,
 } from "@provenance-widgets/core";
 import useProvenanceController from "./hooks/useProvenanceController.js";
 import useRevertedValue from "./hooks/useRevertedValue.js";
@@ -51,7 +51,7 @@ const SingleSelectItem = ({
     children,
     option,
     optionKey,
-    guidance,
+    provenance,
     hasProvenance,
     mode,
     showTimeline,
@@ -67,23 +67,23 @@ const SingleSelectItem = ({
         useElementSize();
     const tooltip = useProvenanceTooltip();
     const timelineVersion =
-        guidance?.domain?.get?.("index")?.[1] ?? 0;
+        provenance?.domain?.get?.("index")?.[1] ?? 0;
     const timeVersion =
-        guidance?.domain?.get?.("time")?.[2] ?? 0;
+        provenance?.domain?.get?.("time")?.[2] ?? 0;
 
     const timelineData = useMemo(() => {
         if (
             !showTimeline ||
             !hasProvenance ||
-            !guidance?.detailedData
+            !provenance?.detailedData
         ) {
             return null;
         }
-        const records = guidance.detailedData.get(optionKey);
+        const records = provenance.detailedData.get(optionKey);
         if (!records) return null;
 
         let maxIndex = 0;
-        for (const optionRecords of guidance.detailedData.values()) {
+        for (const optionRecords of provenance.detailedData.values()) {
             for (const record of optionRecords) {
                 maxIndex = Math.max(
                     maxIndex,
@@ -93,7 +93,7 @@ const SingleSelectItem = ({
             }
         }
         const domainMax =
-            guidance.domain?.get?.("index")?.[1] ?? 0;
+            provenance.domain?.get?.("index")?.[1] ?? 0;
         return {
             records,
             // One extra interaction-width represents "now", as in PW 1.0.
@@ -102,7 +102,7 @@ const SingleSelectItem = ({
     }, [
         showTimeline,
         hasProvenance,
-        guidance,
+        provenance,
         optionKey,
         timelineVersion,
         timeVersion,
@@ -116,7 +116,7 @@ const SingleSelectItem = ({
                     label: tooltipLabel,
                     value: optionKey,
                     record: getAggregateTooltipRecord(
-                        guidance,
+                        provenance,
                         optionKey,
                         "single-selection"
                     ),
@@ -157,7 +157,7 @@ const SingleSelectItem = ({
                         }}
                     >
                         <Bars
-                            guidance={guidance}
+                            provenance={provenance}
                             orientationScheme={interpolateOranges}
                             barKeys={[optionKey]}
                             encodings={{
@@ -210,7 +210,7 @@ const SingleSelectItem = ({
 
             <DropdownBarLabel
                 value={optionKey}
-                guidance={guidance}
+                provenance={provenance}
                 orientationScheme={interpolateOranges}
                 containerWidth={containerWidth}
                 showTimeline={showTimeline}
@@ -504,12 +504,12 @@ const SingleSelectDropdown = (props) => {
         const unregister = registerWidget(registration);
         const refreshRegistry = () => notifyWidget(id);
         strategy.addEventListener(
-            UNILATERAL_GUIDANCE_EVENT_NAME,
+            PROVENANCE_INSERT_EVENT,
             refreshRegistry
         );
         return () => {
             strategy.removeEventListener(
-                UNILATERAL_GUIDANCE_EVENT_NAME,
+                PROVENANCE_INSERT_EVENT,
                 refreshRegistry
             );
             unregister();
@@ -753,7 +753,7 @@ const SingleSelectDropdown = (props) => {
                         <SingleSelectItem
                             option={option}
                             optionKey={optionKey}
-                            guidance={strategy}
+                            provenance={strategy}
                             hasProvenance={hasProvenance}
                             mode={provenanceMode}
                             showTimeline={showTimeline}

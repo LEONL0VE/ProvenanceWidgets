@@ -6,11 +6,11 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
  * drawing detailedData here would layer complete historical selections on top
  * of one another and obscure their aggregate counts.
  */
-export function getRangeBarSegments(guidance, min, max) {
+export function getRangeBarSegments(provenance, min, max) {
     if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return [];
 
-    const aggregateEntries = guidance?.aggregateData instanceof Map
-        ? [...guidance.aggregateData.entries()]
+    const aggregateEntries = provenance?.aggregateData instanceof Map
+        ? [...provenance.aggregateData.entries()]
         : [];
 
     const segments = aggregateEntries

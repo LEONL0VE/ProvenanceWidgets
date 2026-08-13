@@ -2,7 +2,7 @@ import { normalize } from "./utils.js";
 import { getSingleSliderBarGeometry } from "./singleSliderBarGeometry.js";
 
 const SingleSliderBars = ({
-    guidance,
+    provenance,
     barKeys,
     min,
     max,
@@ -13,18 +13,18 @@ const SingleSliderBars = ({
 }) => {
     const domainMin = Number(min);
     const domainMax = Number(max);
-    const countDomain = guidance.domain?.get("count") ?? [0, 1];
-    const colorDomain = guidance.domain?.get("index") ?? [0, 1];
+    const countDomain = provenance.domain?.get("count") ?? [0, 1];
+    const colorDomain = provenance.domain?.get("index") ?? [0, 1];
     const countStart = Number(countDomain[0]) || 0;
     const countEnd = Number(countDomain[1]) || 0;
     const visibleKeys = barKeys.filter(key =>
-        guidance.aggregateData?.has(key)
+        provenance.aggregateData?.has(key)
     );
     const recentKey = visibleKeys.reduce((recent, key) => {
         if (recent === null) return key;
-        const keyIndex = guidance.aggregateData?.get(key)?.index ?? -Infinity;
+        const keyIndex = provenance.aggregateData?.get(key)?.index ?? -Infinity;
         const recentIndex =
-            guidance.aggregateData?.get(recent)?.index ?? -Infinity;
+            provenance.aggregateData?.get(recent)?.index ?? -Infinity;
         return keyIndex > recentIndex ? key : recent;
     }, null);
 
@@ -45,7 +45,7 @@ const SingleSliderBars = ({
             aria-hidden="true"
         >
             {visibleKeys.map(key => {
-                const record = guidance.aggregateData.get(key);
+                const record = provenance.aggregateData.get(key);
                 const barHeight = scaleCount(record?.count);
                 const geometry = getSingleSliderBarGeometry({
                     value: key,

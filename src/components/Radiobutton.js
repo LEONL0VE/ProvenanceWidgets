@@ -45,7 +45,7 @@ const Radiobutton = ({
     const [containerRef, { width: containerWidth }] =
         useElementSize();
     const tooltip = useProvenanceTooltip();
-    const guidance = radioGroup?.guidance;
+    const provenance = radioGroup?.provenance;
     const hasProvenance =
         radioGroup?.hasProvenance ?? false;
     const visualize = radioGroup?.visualize ?? true;
@@ -54,9 +54,9 @@ const Radiobutton = ({
     const provenanceMode =
         radioGroup?.mode ?? "interaction";
     const timelineVersion =
-        guidance?.domain?.get?.("index")?.[1] ?? 0;
+        provenance?.domain?.get?.("index")?.[1] ?? 0;
     const timeVersion =
-        guidance?.domain?.get?.("time")?.[2] ?? 0;
+        provenance?.domain?.get?.("time")?.[2] ?? 0;
     const visibleLabel =
         displayLabel ?? value ?? label ?? "";
     const resolvedInputId =
@@ -87,15 +87,15 @@ const Radiobutton = ({
         if (
             !showTimeline ||
             !hasProvenance ||
-            !guidance?.detailedData
+            !provenance?.detailedData
         ) {
             return null;
         }
-        const records = guidance.detailedData.get(value);
+        const records = provenance.detailedData.get(value);
         if (!records) return null;
 
         let maxIndex = 0;
-        for (const optionRecords of guidance.detailedData.values()) {
+        for (const optionRecords of provenance.detailedData.values()) {
             for (const record of optionRecords) {
                 maxIndex = Math.max(
                     maxIndex,
@@ -105,7 +105,7 @@ const Radiobutton = ({
             }
         }
         const domainMax =
-            guidance.domain?.get?.("index")?.[1] ?? 0;
+            provenance.domain?.get?.("index")?.[1] ?? 0;
         return {
             records,
             // PW 1.0 reserves the final interval for the current state.
@@ -114,7 +114,7 @@ const Radiobutton = ({
     }, [
         showTimeline,
         hasProvenance,
-        guidance,
+        provenance,
         value,
         timelineVersion,
         timeVersion,
@@ -130,7 +130,7 @@ const Radiobutton = ({
                         radioGroup?.id,
                     value,
                     record: getAggregateTooltipRecord(
-                        guidance,
+                        provenance,
                         value,
                         "single-selection"
                     ),
@@ -204,7 +204,7 @@ const Radiobutton = ({
                             }}
                         >
                             <Bars
-                                guidance={guidance}
+                                provenance={provenance}
                                 orientationScheme={
                                     interpolateOranges
                                 }
@@ -278,7 +278,7 @@ const Radiobutton = ({
                 >
                     <DropdownBarLabel
                         value={value}
-                        guidance={guidance}
+                        provenance={provenance}
                         orientationScheme={interpolateOranges}
                         containerWidth={containerWidth}
                         showTimeline={showTimeline}

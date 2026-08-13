@@ -1,6 +1,6 @@
 import { scaleBand } from "d3";
 import useLinearScale from "./hooks/useLinearScale.js";
-import useGuidanceSymbol from "./hooks/useGuidanceSymbol.js";
+import useProvenanceUpdates from "./hooks/useProvenanceUpdates.js";
 import { normalize } from "./utils.js";
 import {
     getMostRecentScentKey,
@@ -18,7 +18,7 @@ const antiDimension = dimension => (
 
 const RangeIntervalBars = props => {
     const {
-        guidance,
+        provenance,
         barKeys,
         rangeInterval,
         width,
@@ -31,7 +31,7 @@ const RangeIntervalBars = props => {
         ? barKeys[barKeys.length - 1]
         : min;
     const intervals = getRangeScentIntervals({
-        guidance,
+        provenance,
         rangeInterval,
         min,
         max,
@@ -52,7 +52,7 @@ const RangeIntervalBars = props => {
                 ((intervalWidth - minWidth) / (maxWidth - minWidth)) *
                     (maxHeight - minHeight)
     );
-    const indexDomain = guidance?.domain?.get?.(colorDomain) ?? [0, 1];
+    const indexDomain = provenance?.domain?.get?.(colorDomain) ?? [0, 1];
     const recentIndex = Math.max(...intervals.map(interval => interval.index));
 
     return (
@@ -92,7 +92,7 @@ const RangeIntervalBars = props => {
 
 export default function Bars(props) {
     const {
-        guidance,
+        provenance,
         orientationScheme,
         encodings: {
             orientation,
@@ -100,7 +100,7 @@ export default function Bars(props) {
             colorDomain,
         },
     } = props;
-    useGuidanceSymbol(guidance);
+    useProvenanceUpdates(provenance);
 
     const primaryDimension = toDimension(orientation);
     const secondaryDimension = antiDimension(primaryDimension);
@@ -108,7 +108,7 @@ export default function Bars(props) {
     const secondaryExtrema = props[secondaryDimension];
     const scale = useLinearScale(
         positionDomain,
-        guidance,
+        provenance,
         [0, primaryExtrema]
     );
 
@@ -116,7 +116,7 @@ export default function Bars(props) {
         return <RangeIntervalBars {...props} />;
     }
 
-    const visibleKeys = getVisibleScentKeys(guidance, props.barKeys);
+    const visibleKeys = getVisibleScentKeys(provenance, props.barKeys);
     const band = scaleBand()
         .domain(props.barKeys)
         .range([0, secondaryExtrema]);
@@ -143,7 +143,7 @@ export default function Bars(props) {
     };
     const recentKey = props.layout === "slider"
         ? getMostRecentScentKey(
-            guidance,
+            provenance,
             visibleKeys,
             colorDomain
         )
@@ -162,7 +162,7 @@ export default function Bars(props) {
             aria-hidden="true"
         >
             {visibleKeys.map(value => {
-                const record = guidance.aggregateData?.get(value);
+                const record = provenance.aggregateData?.get(value);
                 const sliderLayout =
                     props.layout === "slider" &&
                     orientation === "vertical";
@@ -175,7 +175,7 @@ export default function Bars(props) {
                         fill={orientationScheme(
                             normalize(
                                 record?.[colorDomain],
-                                guidance.domain?.get(colorDomain)
+                                provenance.domain?.get(colorDomain)
                             )
                         )}
                         stroke={value === recentKey ? "#000" : "none"}

@@ -14,7 +14,7 @@ const ROW_HORIZONTAL_PADDING = 8;
 const DropdownBarLabel = ({
     value,
     children,
-    guidance,
+    provenance,
     orientationScheme,
     containerWidth,
     showTimeline,
@@ -26,14 +26,14 @@ const DropdownBarLabel = ({
         ? 'black'
         : getBarLabelColor(
             value,
-            guidance,
+            provenance,
             orientationScheme,
             positionDomain,
             colorDomain
         );
     const barWidth = getBarFillRatio(
         value,
-        guidance,
+        provenance,
         positionDomain
     ) * containerWidth;
     const whiteOverlayWidth = Math.max(

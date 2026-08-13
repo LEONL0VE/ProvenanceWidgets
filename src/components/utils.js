@@ -24,15 +24,15 @@ export function generateRange(start, end, step = 1) {
 
 import { color } from 'd3-color';
 
-export function getScentColor(value, guidance, orientationScheme, colorDomain = "index") {
-    if (!guidance || !guidance.aggregateData || !guidance.domain) return null;
+export function getScentColor(value, provenance, orientationScheme, colorDomain = "index") {
+    if (!provenance || !provenance.aggregateData || !provenance.domain) return null;
 
-    const data = guidance.aggregateData.get(value);
+    const data = provenance.aggregateData.get(value);
     if (!data) return null;
 
     const norm = normalize(
         data?.[colorDomain],
-        guidance.domain.get(colorDomain)
+        provenance.domain.get(colorDomain)
     );
 
     return orientationScheme(norm);
@@ -59,33 +59,33 @@ export function getContrastColor(backgroundColor) {
  */
 export function getBarLabelColor(
     value,
-    guidance,
+    provenance,
     orientationScheme,
     positionDomain = 'interactions',
     colorDomain = 'index'
 ) {
-    const record = guidance?.aggregateData?.get?.(value);
+    const record = provenance?.aggregateData?.get?.(value);
     const position = Number(record?.[positionDomain]);
-    const domainStart = Number(guidance?.domain?.get?.(positionDomain)?.[0] ?? 0);
+    const domainStart = Number(provenance?.domain?.get?.(positionDomain)?.[0] ?? 0);
 
     if (!Number.isFinite(position) || position <= domainStart) {
         return 'black';
     }
 
     return getContrastColor(
-        getScentColor(value, guidance, orientationScheme, colorDomain)
+        getScentColor(value, provenance, orientationScheme, colorDomain)
     );
 }
 
 export function getBarFillRatio(
     value,
-    guidance,
+    provenance,
     positionDomain = 'interactions'
 ) {
     const position = Number(
-        guidance?.aggregateData?.get?.(value)?.[positionDomain]
+        provenance?.aggregateData?.get?.(value)?.[positionDomain]
     );
-    const domain = guidance?.domain?.get?.(positionDomain);
+    const domain = provenance?.domain?.get?.(positionDomain);
     const domainStart = Number(domain?.[0]);
     const domainEnd = Number(domain?.[1]);
 

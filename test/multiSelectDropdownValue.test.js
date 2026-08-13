@@ -117,7 +117,7 @@ test("deduplicates V1 and V2 Multi Select callbacks", () => {
 });
 
 test("restores every option active at the clicked Temporal point", () => {
-    const guidance = {
+    const provenance = {
         detailedData: new Map([
             ["NY", [{
                 select: { index: 1, time: new Date(1000) },
@@ -131,14 +131,14 @@ test("restores every option active at the clicked Temporal point", () => {
 
     assert.deepEqual(
         getMultiSelectKeysAtTimelinePoint({
-            guidance,
+            provenance,
             point: 2,
         }),
         ["NY", "LDN"]
     );
     assert.deepEqual(
         getMultiSelectKeysAtTimelinePoint({
-            guidance,
+            provenance,
             point: 4000,
             mode: "time",
         }),

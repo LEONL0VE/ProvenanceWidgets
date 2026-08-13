@@ -52,11 +52,11 @@ export function getWidgetLabel(props, fallback) {
     return props?.['data-label'] || props?.dataLabel || props?.label || fallback;
 }
 
-export function getAggregateTooltipRecord(guidance, value, kind) {
-    const aggregateRecord = guidance?.aggregateData?.get?.(value);
+export function getAggregateTooltipRecord(provenance, value, kind) {
+    const aggregateRecord = provenance?.aggregateData?.get?.(value);
     if (!aggregateRecord) return null;
 
-    const detailedRecords = guidance?.detailedData?.get?.(value);
+    const detailedRecords = provenance?.detailedData?.get?.(value);
     if (!Array.isArray(detailedRecords) || detailedRecords.length === 0) {
         return aggregateRecord;
     }

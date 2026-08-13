@@ -65,7 +65,7 @@ const Checkbox = ({
         containerRef(element);
     }, [containerRef]);
     const tooltip = useProvenanceTooltip();
-    const guidance = checkboxGroup?.guidance;
+    const provenance = checkboxGroup?.provenance;
     const hasProvenance =
         checkboxGroup?.hasProvenance ?? false;
     const visualize = checkboxGroup?.visualize ?? true;
@@ -74,9 +74,9 @@ const Checkbox = ({
     const provenanceMode =
         checkboxGroup?.mode ?? "interaction";
     const timelineVersion =
-        guidance?.domain?.get?.("index")?.[1] ?? 0;
+        provenance?.domain?.get?.("index")?.[1] ?? 0;
     const timeVersion =
-        guidance?.domain?.get?.("time")?.[2] ?? 0;
+        provenance?.domain?.get?.("time")?.[2] ?? 0;
     const visibleLabel =
         displayLabel ?? label ?? value ?? "";
     const resolvedInputId =
@@ -106,15 +106,15 @@ const Checkbox = ({
         if (
             !showTimeline ||
             !hasProvenance ||
-            !guidance?.detailedData
+            !provenance?.detailedData
         ) {
             return null;
         }
-        const records = guidance.detailedData.get(value);
+        const records = provenance.detailedData.get(value);
         if (!records) return null;
 
         let maxIndex = 0;
-        for (const optionRecords of guidance.detailedData.values()) {
+        for (const optionRecords of provenance.detailedData.values()) {
             for (const record of optionRecords) {
                 maxIndex = Math.max(
                     maxIndex,
@@ -124,7 +124,7 @@ const Checkbox = ({
             }
         }
         const domainMax =
-            guidance.domain?.get?.("index")?.[1] ?? 0;
+            provenance.domain?.get?.("index")?.[1] ?? 0;
         return {
             records,
             maxIndex: Math.max(maxIndex, domainMax) + 1,
@@ -132,7 +132,7 @@ const Checkbox = ({
     }, [
         showTimeline,
         hasProvenance,
-        guidance,
+        provenance,
         value,
         timelineVersion,
         timeVersion,
@@ -148,7 +148,7 @@ const Checkbox = ({
                         checkboxGroup?.id,
                     value,
                     record: getAggregateTooltipRecord(
-                        guidance,
+                        provenance,
                         value,
                         "multi-selection"
                     ),
@@ -246,7 +246,7 @@ const Checkbox = ({
                             }}
                         >
                             <Bars
-                                guidance={guidance}
+                                provenance={provenance}
                                 orientationScheme={
                                     interpolateOranges
                                 }
@@ -325,7 +325,7 @@ const Checkbox = ({
                 >
                     <DropdownBarLabel
                         value={value}
-                        guidance={guidance}
+                        provenance={provenance}
                         orientationScheme={interpolateOranges}
                         containerWidth={containerWidth}
                         showTimeline={showTimeline}

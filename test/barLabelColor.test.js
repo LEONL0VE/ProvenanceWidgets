@@ -6,7 +6,7 @@ import {
     shouldRenderBarLabelOverlay,
 } from '../src/components/utils.js';
 
-const guidanceWith = (record) => ({
+const provenanceWith = (record) => ({
     aggregateData: new Map([['option', record]]),
     domain: new Map([
         ['interactions', [0, 2]],
@@ -15,31 +15,31 @@ const guidanceWith = (record) => ({
 });
 
 test('uses black when no provenance bar is rendered', () => {
-    const guidance = guidanceWith({
+    const provenance = provenanceWith({
         interactions: 0,
         index: 3,
     });
 
     assert.equal(
-        getBarLabelColor('option', guidance, () => '#3b0a00'),
+        getBarLabelColor('option', provenance, () => '#3b0a00'),
         'black'
     );
 });
 
 test('uses the scent contrast color when the provenance bar is visible', () => {
-    const guidance = guidanceWith({
+    const provenance = provenanceWith({
         interactions: 1,
         index: 3,
     });
 
     assert.equal(
-        getBarLabelColor('option', guidance, () => '#3b0a00'),
+        getBarLabelColor('option', provenance, () => '#3b0a00'),
         'white'
     );
 });
 
 test('uses black when an option has no aggregate record', () => {
-    const guidance = {
+    const provenance = {
         aggregateData: new Map(),
         domain: new Map([
             ['interactions', [0, 0]],
@@ -48,22 +48,22 @@ test('uses black when an option has no aggregate record', () => {
     };
 
     assert.equal(
-        getBarLabelColor('option', guidance, () => '#3b0a00'),
+        getBarLabelColor('option', provenance, () => '#3b0a00'),
         'black'
     );
 });
 
 test('calculates the visible bar ratio used to clip a two-color label', () => {
-    const guidance = guidanceWith({
+    const provenance = provenanceWith({
         interactions: 1,
         index: 3,
     });
 
-    assert.equal(getBarFillRatio('option', guidance), 0.5);
+    assert.equal(getBarFillRatio('option', provenance), 0.5);
 });
 
 test('clamps invalid or out-of-domain bar ratios', () => {
-    const aboveDomain = guidanceWith({
+    const aboveDomain = provenanceWith({
         interactions: 5,
         index: 3,
     });

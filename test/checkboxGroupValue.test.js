@@ -104,7 +104,7 @@ test("identifies the one toggled checkbox as PW's caller", () => {
 });
 
 test("restores the complete selected set at a Temporal point", () => {
-    const guidance = {
+    const provenance = {
         detailedData: new Map([
             ["chicken", [{
                 select: { index: 1 },
@@ -118,14 +118,14 @@ test("restores the complete selected set at a Temporal point", () => {
 
     assert.deepEqual(
         getCheckboxKeysAtTimelinePoint({
-            guidance,
+            provenance,
             point: 2,
         }),
         ["chicken", "beef"]
     );
     assert.deepEqual(
         getCheckboxKeysAtTimelinePoint({
-            guidance,
+            provenance,
             point: 4,
         }),
         ["beef"]

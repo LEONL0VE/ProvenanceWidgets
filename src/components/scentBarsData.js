@@ -1,36 +1,36 @@
-export function getVisibleScentKeys(guidance, barKeys = []) {
+export function getVisibleScentKeys(provenance, barKeys = []) {
     return barKeys.filter(key => (
-        guidance?.aggregateData?.has?.(key) ||
-        guidance?.detailedData?.has?.(key)
+        provenance?.aggregateData?.has?.(key) ||
+        provenance?.detailedData?.has?.(key)
     ));
 }
 
 export function getMostRecentScentKey(
-    guidance,
+    provenance,
     visibleKeys,
     colorDomain = "index"
 ) {
     return visibleKeys.reduce((recent, key) => {
         if (recent === null) return key;
         const keyValue =
-            guidance?.aggregateData?.get?.(key)?.[colorDomain] ??
+            provenance?.aggregateData?.get?.(key)?.[colorDomain] ??
             -Infinity;
         const recentValue =
-            guidance?.aggregateData?.get?.(recent)?.[colorDomain] ??
+            provenance?.aggregateData?.get?.(recent)?.[colorDomain] ??
             -Infinity;
         return keyValue > recentValue ? key : recent;
     }, null);
 }
 
 export function getRangeScentIntervals({
-    guidance,
+    provenance,
     rangeInterval,
     min,
     max,
     width,
 }) {
-    const records = guidance?.detailedData?.size > 0
-        ? [...guidance.detailedData.values()].sort(
+    const records = provenance?.detailedData?.size > 0
+        ? [...provenance.detailedData.values()].sort(
             (left, right) => left.index - right.index
         )
         : (

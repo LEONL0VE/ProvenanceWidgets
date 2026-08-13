@@ -8,7 +8,7 @@ import {
 } from "../src/components/scentBarsData.js";
 
 test("scent bars omit options without provenance", () => {
-    const guidance = {
+    const provenance = {
         aggregateData: new Map([
             ["Rome", { interactions: 2, index: 3 }],
         ]),
@@ -19,7 +19,7 @@ test("scent bars omit options without provenance", () => {
 
     assert.deepEqual(
         getVisibleScentKeys(
-            guidance,
+            provenance,
             ["New York", "Rome", "London"]
         ),
         ["Rome", "London"]
@@ -27,7 +27,7 @@ test("scent bars omit options without provenance", () => {
 });
 
 test("scent bars identify the most recent aggregate option", () => {
-    const guidance = {
+    const provenance = {
         aggregateData: new Map([
             ["Rome", { index: 2 }],
             ["London", { index: 5 }],
@@ -37,7 +37,7 @@ test("scent bars identify the most recent aggregate option", () => {
 
     assert.equal(
         getMostRecentScentKey(
-            guidance,
+            provenance,
             ["Rome", "London", "Paris"]
         ),
         "London"
@@ -45,7 +45,7 @@ test("scent bars identify the most recent aggregate option", () => {
 });
 
 test("range scent intervals preserve order and pixel geometry", () => {
-    const guidance = {
+    const provenance = {
         detailedData: new Map([
             [2, { value: [60, 20], index: 2 }],
             [1, { value: [10, 30], index: 1 }],
@@ -54,7 +54,7 @@ test("range scent intervals preserve order and pixel geometry", () => {
 
     assert.deepEqual(
         getRangeScentIntervals({
-            guidance,
+            provenance,
             min: 0,
             max: 100,
             width: 500,
@@ -81,7 +81,7 @@ test("range scent intervals preserve order and pixel geometry", () => {
 test("range scent intervals can show an unrecorded current range", () => {
     assert.deepEqual(
         getRangeScentIntervals({
-            guidance: { detailedData: new Map() },
+            provenance: { detailedData: new Map() },
             rangeInterval: [25, 75],
             min: 0,
             max: 100,

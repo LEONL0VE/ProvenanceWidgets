@@ -1,7 +1,7 @@
 import { getRangeBarSegments, normalizeRangeBarIndex } from './rangeSliderBarData.js';
 
 const RangeSliderBars = ({
-    guidance,
+    provenance,
     min,
     max,
     width,
@@ -10,10 +10,10 @@ const RangeSliderBars = ({
     getBarProps,
     onRangeSelect,
 }) => {
-    const segments = getRangeBarSegments(guidance, min, max);
+    const segments = getRangeBarSegments(provenance, min, max);
     const maxCount = Math.max(1, ...segments.map(segment => segment.count));
-    const latestIndex = guidance?.domain?.get('index')?.[1] ?? 0;
-    const indexDomain = guidance?.domain?.get('index') ?? [0, latestIndex];
+    const latestIndex = provenance?.domain?.get('index')?.[1] ?? 0;
+    const indexDomain = provenance?.domain?.get('index') ?? [0, latestIndex];
     const maxBarHeight = height * 0.8;
     const x = value => ((value - min) / (max - min)) * width;
 

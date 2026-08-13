@@ -9,7 +9,7 @@ import {
 import { interpolateOranges } from "d3";
 import {
     TextProvenance,
-    UNILATERAL_GUIDANCE_EVENT_NAME,
+    PROVENANCE_INSERT_EVENT,
 } from "@provenance-widgets/core";
 import useProvenanceController from "./hooks/useProvenanceController.js";
 import useRevertedValue from "./hooks/useRevertedValue.js";
@@ -202,13 +202,13 @@ const InputText = (props) => {
         const unregister = registerWidget(registration);
         const refreshRegistry = () => notifyWidget(id);
         strategy.addEventListener(
-            UNILATERAL_GUIDANCE_EVENT_NAME,
+            PROVENANCE_INSERT_EVENT,
             refreshRegistry
         );
 
         return () => {
             strategy.removeEventListener(
-                UNILATERAL_GUIDANCE_EVENT_NAME,
+                PROVENANCE_INSERT_EVENT,
                 refreshRegistry
             );
             unregister();
