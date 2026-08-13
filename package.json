@@ -32,7 +32,7 @@
     "react-dom": "^19.2.0"
   },
   "dependencies": {
-    "@provenance-widgets/core": "github:ProvenanceWidgets/core#semver:^1.0.0",
+    "@provenance-widgets/core": "github:ProvenanceWidgets/core#semver:^1.0.1",
     "d3": "^7.9.0",
     "d3-color": "^3.1.0",
     "primereact": "^10.9.7",
