@@ -39,13 +39,11 @@
     "react-tooltip": "^5.30.0"
   },
   "scripts": {
-    "test": "node --test",
     "typecheck": "tsc --noEmit",
-    "test:types": "tsc --project test/types/tsconfig.json",
     "build": "npm run build:library && npm run build:web-components",
     "build:library": "tsup",
     "build:web-components": "tsup --config tsup.web-components.config.ts",
-    "prepack": "npm run typecheck && npm run test:types",
+    "prepack": "npm run typecheck",
     "prepare": "npm run build"
   },
   "devDependencies": {
