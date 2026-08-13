@@ -9,7 +9,7 @@ import {
     getRadioOptionValue,
     resolveRadioGroupValue,
     restoreRadioGroupTemporalValue,
-} from "../src/components/radioGroupValue.js";
+} from "../src/shared/logic/radioGroupValue.js";
 
 const v1Data = [
     { label: "Cheese", value: "cheese", inputId: "ingredient-1" },

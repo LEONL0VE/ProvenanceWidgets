@@ -8,7 +8,7 @@ import {
     getInputTextEventValue,
     normalizeInputTextValue,
     restoreInputTextTemporalValue,
-} from "../src/components/inputTextValue.js";
+} from "../src/shared/logic/inputTextValue.js";
 
 test("keeps every committed search as a separate Temporal entry", () => {
     const timestamp = new Date("2026-03-01T10:00:00.000Z");

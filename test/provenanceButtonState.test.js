@@ -6,7 +6,7 @@ import {
     hasUserProvenance,
     isInsideProvenanceInteraction,
     PROVENANCE_BUTTON_TOOLTIP_DELAY_MS,
-} from "../src/components/provenanceButtonState.js";
+} from "../src/shared/logic/provenanceButtonState.js";
 
 const provenance = ({
     interacted,

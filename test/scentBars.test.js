@@ -5,7 +5,7 @@ import {
     getMostRecentScentKey,
     getRangeScentIntervals,
     getVisibleScentKeys,
-} from "../src/components/scentBarsData.js";
+} from "../src/shared/logic/scentBarsData.js";
 
 test("scent bars omit options without provenance", () => {
     const provenance = {

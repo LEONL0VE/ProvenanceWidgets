@@ -4,7 +4,7 @@ import {
     getBarFillRatio,
     getBarLabelColor,
     shouldRenderBarLabelOverlay,
-} from '../src/components/utils.js';
+} from '../src/shared/logic/barAppearance.js';
 
 const provenanceWith = (record) => ({
     aggregateData: new Map([['option', record]]),

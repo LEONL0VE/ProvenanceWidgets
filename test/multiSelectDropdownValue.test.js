@@ -12,7 +12,7 @@ import {
     provenanceValueToMultiSelect,
     resolveMultiSelectOptions,
     restoreMultiSelectTemporalValue,
-} from "../src/components/multiSelectDropdownValue.js";
+} from "../src/shared/logic/multiSelectDropdownValue.js";
 
 const v1Options = [
     { name: "New York", code: "NY" },

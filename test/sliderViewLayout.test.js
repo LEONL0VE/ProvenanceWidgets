@@ -4,7 +4,7 @@ import test from "node:test";
 import {
     getSliderViewPanelLayout,
     hasVisibleTemporalBrush,
-} from "../src/components/sliderViewLayout.js";
+} from "../src/shared/logic/sliderViewLayout.js";
 
 test("uses the compact slider-view gutter for a single history entry", () => {
     assert.deepEqual(

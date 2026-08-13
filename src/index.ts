@@ -1,24 +1,24 @@
 import type { ReactElement } from "react";
 
-import AggregateViewImplementation from "./components/AggregateView.js";
-import ChartImplementation from "./components/Chart.js";
-import CheckboxImplementation from "./components/Checkbox.js";
-import CheckboxGroupImplementation from "./components/CheckboxGroup.js";
-import InputTextImplementation from "./components/Input.js";
-import MultiSelectDropdownImplementation from "./components/MultiSelectDropdown.js";
-import ProvenanceButtonImplementation from "./components/ProvenanceButton.js";
-import RadiobuttonImplementation from "./components/Radiobutton.js";
-import RadioGroupImplementation from "./components/RadioGroup.js";
-import RangesliderImplementation from "./components/Rangeslider.js";
-import SingleSelectDropdownImplementation from "./components/SingleSelectDropdown.js";
-import SinglesliderImplementation from "./components/Singleslider.js";
-import TimelineVisImplementation from "./components/TimelineVis.js";
-import SuperProvenanceWidgetImplementation from "./components/SuperProvenance.js";
-import ProvenanceProviderImplementation from "./components/providers/ProvenanceProvider.js";
-import useProvenanceImplementation from "./components/hooks/useProvenance.js";
-import useRevertedValueImplementation from "./components/hooks/useRevertedValue.js";
-import useProvenanceControllerImplementation from "./components/hooks/useProvenanceController.js";
-import useWidgetRegistryImplementation from "./components/hooks/useWidgetRegistry.js";
+import AggregateViewImplementation from "./widgets/AggregateView.js";
+import ChartImplementation from "./widgets/Chart.js";
+import CheckboxImplementation from "./widgets/Checkbox.js";
+import CheckboxGroupImplementation from "./widgets/CheckboxGroup.js";
+import InputTextImplementation from "./widgets/InputText.js";
+import MultiSelectDropdownImplementation from "./widgets/MultiSelectDropdown.js";
+import ProvenanceButtonImplementation from "./widgets/ProvenanceButton.js";
+import RadiobuttonImplementation from "./widgets/RadioButton.js";
+import RadioGroupImplementation from "./widgets/RadioGroup.js";
+import RangesliderImplementation from "./widgets/RangeSlider.js";
+import SingleSelectDropdownImplementation from "./widgets/SingleSelectDropdown.js";
+import SinglesliderImplementation from "./widgets/SingleSlider.js";
+import TimelineVisImplementation from "./widgets/TimelineVis.js";
+import SuperProvenanceWidgetImplementation from "./widgets/SuperProvenanceWidget.js";
+import ProvenanceProviderImplementation from "./provenance/ProvenanceProvider.js";
+import useProvenanceImplementation from "./provenance/hooks/useProvenance.js";
+import useRevertedValueImplementation from "./provenance/hooks/useRevertedValue.js";
+import useProvenanceControllerImplementation from "./provenance/hooks/useProvenanceController.js";
+import useWidgetRegistryImplementation from "./provenance/hooks/useWidgetRegistry.js";
 import type {
   AggregateViewProps,
   ChartProps,

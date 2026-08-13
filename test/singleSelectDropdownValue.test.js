@@ -13,7 +13,7 @@ import {
     resolveSingleSelectOption,
     restoreSingleSelectTemporalValue,
     singleSelectToProvenanceValue,
-} from "../src/components/singleSelectDropdownValue.js";
+} from "../src/shared/logic/singleSelectDropdownValue.js";
 
 const v1Options = [
     { name: "New York", code: "NY" },

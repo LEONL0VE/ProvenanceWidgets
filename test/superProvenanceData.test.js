@@ -8,7 +8,7 @@ import {
     getSuperWidgetIds,
     getRegisteredWidgetValueAtTime,
     restoreRegisteredWidgetsAtTime,
-} from "../src/components/superProvenanceData.js";
+} from "../src/shared/logic/superProvenanceData.js";
 
 const time = value => new Date(`2026-07-30T01:00:0${value}.000Z`);
 

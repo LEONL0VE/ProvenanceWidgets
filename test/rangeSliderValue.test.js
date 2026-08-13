@@ -7,7 +7,7 @@ import {
     normalizeRangeSliderValue,
     rangeSliderValueKey,
     rangeSliderValuesEqual,
-} from "../src/components/rangeSliderValue.js";
+} from "../src/shared/logic/rangeSliderValue.js";
 
 test("supports both React array values and V1 low/high values", () => {
     assert.deepEqual(

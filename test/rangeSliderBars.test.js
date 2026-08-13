@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getRangeBarSegments } from '../src/components/rangeSliderBarData.js';
+import { getRangeBarSegments } from '../src/shared/logic/rangeSliderBarData.js';
 
 test('uses disjoint aggregate provenance buckets instead of overlapping history', () => {
     const provenance = {

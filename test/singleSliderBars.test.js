@@ -4,7 +4,7 @@ import test from "node:test";
 import {
     getSingleSliderBarGeometry,
     SINGLE_SLIDER_BAR_WIDTH,
-} from "../src/components/singleSliderBarGeometry.js";
+} from "../src/shared/logic/singleSliderBarGeometry.js";
 
 test("single-slider bars center on the continuous slider coordinate", () => {
     const geometry = getSingleSliderBarGeometry({

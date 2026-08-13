@@ -9,7 +9,7 @@ import {
     getTooltipAnchorProps,
     getWidgetLabel,
     suffixed,
-} from '../src/components/provenanceTooltip.js';
+} from '../src/shared/logic/provenanceTooltip.js';
 
 const time = new Date('2026-07-07T13:09:07Z');
 const stamp = time.toLocaleString();

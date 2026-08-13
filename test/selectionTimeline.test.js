@@ -4,7 +4,7 @@ import {
     buildSelectionTimelineBars,
     getSelectionTimeDomain,
     normalizeSelectionBrushRange,
-} from "../src/components/selectionTimeline.js";
+} from "../src/shared/logic/selectionTimeline.js";
 
 const time = second =>
     new Date(`2026-07-30T10:00:0${second}.000Z`);

@@ -1,14 +1,14 @@
 import React from "react";
 import { createRoot, type Root } from "react-dom/client";
-import CheckboxGroup from "../components/CheckboxGroup.js";
-import InputText from "../components/Input.js";
-import MultiSelectDropdown from "../components/MultiSelectDropdown.js";
-import ProvenanceButton from "../components/ProvenanceButton.js";
-import RadioGroup from "../components/RadioGroup.js";
-import Rangeslider from "../components/Rangeslider.js";
-import SingleSelectDropdown from "../components/SingleSelectDropdown.js";
-import Singleslider from "../components/Singleslider.js";
-import ProvenanceProvider from "../components/providers/ProvenanceProvider.js";
+import CheckboxGroup from "../widgets/CheckboxGroup.js";
+import InputText from "../widgets/InputText.js";
+import MultiSelectDropdown from "../widgets/MultiSelectDropdown.js";
+import ProvenanceButton from "../widgets/ProvenanceButton.js";
+import RadioGroup from "../widgets/RadioGroup.js";
+import Rangeslider from "../widgets/RangeSlider.js";
+import SingleSelectDropdown from "../widgets/SingleSelectDropdown.js";
+import Singleslider from "../widgets/SingleSlider.js";
+import ProvenanceProvider from "../provenance/ProvenanceProvider.js";
 import {
     COMMON_ATTRIBUTE_SCHEMA,
     COMMON_PROPERTIES,
@@ -404,7 +404,7 @@ const WebProvenanceSlider = createElementClass({
                 }}
                 onSelectedChange={(value: number) => {
                     element.updateProperty("value", value);
-                    // PW 1.0 exposes ngx-slider's ChangeContext shape.
+                    // Preserve the public ChangeContext event shape.
                     emit(element, "selectedChange", { value });
                 }}
             />

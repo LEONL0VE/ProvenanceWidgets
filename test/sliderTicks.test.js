@@ -4,7 +4,7 @@ import {
     buildSliderLabels,
     buildSliderTicks,
     getSliderPosition,
-} from "../src/components/sliderTicks.js";
+} from "../src/shared/logic/sliderTicks.js";
 
 test("builds PW 1.0 showTicks values from the slider step", () => {
     assert.deepEqual(

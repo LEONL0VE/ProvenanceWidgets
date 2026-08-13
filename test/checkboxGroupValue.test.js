@@ -11,7 +11,7 @@ import {
     isResolvableCheckboxGroupValue,
     resolveCheckboxGroupValue,
     restoreCheckboxGroupTemporalValue,
-} from "../src/components/checkboxGroupValue.js";
+} from "../src/shared/logic/checkboxGroupValue.js";
 
 const v1Data = [
     { label: "Chicken", value: "chicken", inputId: "protein-1" },
