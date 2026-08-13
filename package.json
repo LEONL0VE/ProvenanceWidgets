@@ -44,11 +44,12 @@
     "test:types": "tsc --project test/types/tsconfig.json",
     "build": "npm run build:library && npm run build:web-components",
     "build:library": "tsup",
-    "build:web-components": "tsup --config tsup.web-components.config.ts && node scripts/prepare-web-components.mjs",
+    "build:web-components": "tsup --config tsup.web-components.config.ts",
     "prepack": "npm run typecheck && npm run test:types",
     "prepare": "npm run build"
   },
   "devDependencies": {
+    "@types/node": "^20.19.43",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "tsup": "^8.5.1",
